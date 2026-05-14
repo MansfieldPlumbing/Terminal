@@ -10,6 +10,7 @@ declare global {
       // public void InvokeCommand(string command) { ... }
       invokeCommand: (command: string) => void;
       minimizeApp?: () => void;
+      notifyReady?: () => void;
     };
     
     // Global callback for the Android layer to push text back into the React app
@@ -65,3 +66,4 @@ export const executeCommand = (command: string) => {
     }, 200);
   }
 };
+

@@ -6,6 +6,7 @@ using Java.Interop;
 using System;
 using System.Text;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Management.Automation.Provider;
@@ -14,12 +15,13 @@ using System.Runtime.InteropServices;
 
 namespace TerminalApp;
 
-[Activity(Label = "No Cap Terminal", MainLauncher = true, Theme = "@android:style/Theme.NoTitleBar.Fullscreen")]
+[Activity(Label = "Terminal", MainLauncher = true, Theme = "@android:style/Theme.NoTitleBar.Fullscreen")]
 public class MainActivity : Activity
 {
     private WebView _webView;
     private PowerShell _ps;
     private bool _isReactReady = false;
+    private Queue<string> _outputQueue = new Queue<string>();
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -47,12 +49,8 @@ public class MainActivity : Activity
 
         SetContentView(_webView);
 
-        Task.Run(async () => 
-        {
-            await Task.Delay(2000);
-            _isReactReady = true;
-            InitializePowerShell();
-        });
+        // Boot the engine INSTANTLY. Output goes to the queue if React isn't awake yet.
+        Task.Run(() => InitializePowerShell());
     }
 
     private void LoadFromAssembly(InitialSessionState iss, Assembly assembly)
@@ -60,19 +58,11 @@ public class MainActivity : Activity
         try {
             foreach (var type in assembly.GetTypes())
             {
-                // 1. Load the Cmdlets
                 var cmdletAttr = type.GetCustomAttribute<CmdletAttribute>();
-                if (cmdletAttr != null)
-                {
-                    iss.Commands.Add(new SessionStateCmdletEntry($"{cmdletAttr.VerbName}-{cmdletAttr.NounName}", type, ""));
-                }
+                if (cmdletAttr != null) iss.Commands.Add(new SessionStateCmdletEntry($"{cmdletAttr.VerbName}-{cmdletAttr.NounName}", type, ""));
                 
-                // 2. Load the Providers (FileSystem, Environment, Alias, etc)
                 var providerAttr = type.GetCustomAttribute<CmdletProviderAttribute>();
-                if (providerAttr != null)
-                {
-                    iss.Providers.Add(new SessionStateProviderEntry(providerAttr.ProviderName, type, ""));
-                }
+                if (providerAttr != null) iss.Providers.Add(new SessionStateProviderEntry(providerAttr.ProviderName, type, ""));
             }
         } catch (Exception ex) {
             Log.Warn("PWSH-TEST", $"Could not load from {assembly.FullName}: {ex.Message}");
@@ -95,22 +85,17 @@ public class MainActivity : Activity
             _ps.AddCommand("Set-Location").AddParameter("Path", this.FilesDir.AbsolutePath).Invoke();
             _ps.Commands.Clear();
             
-            SendToReact("PowerShell 7.6.1 Engine Initialized (Native Android Sandbox)\n");
+            SendToReact("PowerShell 7.6.1 Preview Engine (Native Android Sandbox)\n");
         }
         catch (Exception ex)
         {
-            Log.Error("PWSH-TEST", $"Engine Boot Error: {ex.ToString()}");
             SendToReact($"Engine Boot Error: {ex.Message}\n");
         }
     }
 
     public void ExecuteCommand(string command)
     {
-        if (_ps == null) 
-        {
-            SendToReact("Error: PowerShell engine is still initializing...\n");
-            return;
-        }
+        if (_ps == null) { SendToReact("Error: PowerShell engine is still initializing...\n"); return; }
 
         Task.Run(() => 
         {
@@ -118,40 +103,41 @@ public class MainActivity : Activity
             {
                 _ps.Commands.Clear();
                 _ps.Streams.ClearStreams();
-                
                 _ps.AddScript(command).AddCommand("Out-String");
 
                 var results = _ps.Invoke<string>();
                 
                 StringBuilder sb = new StringBuilder();
-                foreach (var result in results)
-                {
-                    sb.Append(result);
-                }
-
-                if (_ps.Streams.Error.Count > 0)
-                {
-                    foreach (var err in _ps.Streams.Error)
-                    {
-                        sb.AppendLine("ERROR: " + err.ToString());
-                    }
-                }
+                foreach (var result in results) sb.Append(result);
+                if (_ps.Streams.Error.Count > 0) foreach (var err in _ps.Streams.Error) sb.AppendLine("ERROR: " + err.ToString());
 
                 string finalOutput = sb.ToString();
                 if (string.IsNullOrWhiteSpace(finalOutput)) finalOutput = "\n";
                 
                 SendToReact(finalOutput);
             }
-            catch (Exception ex)
-            {
-                SendToReact($"Execution Error: {ex.Message}\n");
-            }
+            catch (Exception ex) { SendToReact($"Execution Error: {ex.Message}\n"); }
         });
+    }
+
+    public void NotifyReactReady()
+    {
+        _isReactReady = true;
+        // The second React says "I'm ready", dump everything we've been saving up!
+        while (_outputQueue.Count > 0)
+        {
+            SendToReact(_outputQueue.Dequeue());
+        }
     }
 
     public void SendToReact(string text)
     {
-        if (!_isReactReady) return;
+        if (!_isReactReady)
+        {
+            _outputQueue.Enqueue(text);
+            return;
+        }
+
         string b64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(text));
         RunOnUiThread(() => 
         {
@@ -163,25 +149,17 @@ public class MainActivity : Activity
 public class PwshBridge : Java.Lang.Object
 {
     private readonly MainActivity _activity;
-
-    public PwshBridge(MainActivity activity)
-    {
-        _activity = activity;
-    }
+    public PwshBridge(MainActivity activity) { _activity = activity; }
 
     [Export("invokeCommand")]
     [JavascriptInterface]
-    public void InvokeCommand(string command)
-    {
-        _activity.ExecuteCommand(command);
-    }
+    public void InvokeCommand(string command) { _activity.ExecuteCommand(command); }
+
+    [Export("notifyReady")]
+    [JavascriptInterface]
+    public void NotifyReady() { _activity.NotifyReactReady(); }
 
     [Export("minimizeApp")]
     [JavascriptInterface]
-    public void MinimizeApp()
-    {
-        _activity.MoveTaskToBack(true);
-    }
+    public void MinimizeApp() { _activity.MoveTaskToBack(true); }
 }
-
-
