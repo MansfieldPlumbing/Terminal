@@ -507,6 +507,10 @@ while ($true) {
     const unsubscribe = subscribeToOutput((text) => {
       setTerminalHistory(prev => [...prev, { type: 'output', text }]);
     });
+    // React Handshake! Tell C# we are awake.
+    if (typeof window !== 'undefined' && window.AndroidBridge && window.AndroidBridge.notifyReady) {
+      window.AndroidBridge.notifyReady();
+    }
     return () => unsubscribe();
   }, []);
 
@@ -918,6 +922,7 @@ Type 'help' to get help.
     </div>
   );
 }
+
 
 
 

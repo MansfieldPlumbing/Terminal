@@ -95,6 +95,7 @@ public class MainActivity : Activity
 
     public void ExecuteCommand(string command)
     {
+        if (!_isReactReady) NotifyReactReady(); // Failsafe: if user types, React is obviously awake!
         if (_ps == null) { SendToReact("Error: PowerShell engine is still initializing...\n"); return; }
 
         Task.Run(() => 
@@ -163,3 +164,4 @@ public class PwshBridge : Java.Lang.Object
     [JavascriptInterface]
     public void MinimizeApp() { _activity.MoveTaskToBack(true); }
 }
+
