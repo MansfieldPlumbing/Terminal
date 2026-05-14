@@ -12,6 +12,7 @@ using System.Management.Automation.Runspaces;
 using System.Management.Automation.Provider;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.IO; // Added for File operations
 
 namespace TerminalApp;
 
@@ -49,7 +50,6 @@ public class MainActivity : Activity
 
         SetContentView(_webView);
 
-        // Boot the engine INSTANTLY. Output goes to the queue if React isn't awake yet.
         Task.Run(() => InitializePowerShell());
     }
 
@@ -82,10 +82,63 @@ public class MainActivity : Activity
 
             _ps = PowerShell.Create(iss);
             
-            _ps.AddCommand("Set-Location").AddParameter("Path", this.FilesDir.AbsolutePath).Invoke();
+            // Set Native Path
+            string appBasePath = this.FilesDir.AbsolutePath;
+            _ps.AddCommand("Set-Location").AddParameter("Path", appBasePath).Invoke();
+            _ps.Commands.Clear();
+
+            // --- PROFILE MANAGEMENT ---
+            string profilePath = Path.Combine(appBasePath, "profile.ps1");
+            if (!File.Exists(profilePath))
+            {
+                string defaultProfile = @"
+Set-Alias dir Get-ChildItem
+Set-Alias ls Get-ChildItem
+Set-Alias cd Set-Location
+Set-Alias pwd Get-Location
+Set-Alias echo Write-Output
+Set-Alias cat Get-Content
+Set-Alias clear Clear-Host
+Set-Alias cls Clear-Host
+Set-Alias rm Remove-Item
+Set-Alias cp Copy-Item
+Set-Alias mv Move-Item
+Set-Alias select Select-Object
+Set-Alias where Where-Object
+Set-Alias % ForEach-Object
+Set-Alias ? Where-Object
+Set-Alias curl Invoke-WebRequest
+Set-Alias wget Invoke-WebRequest
+
+function Get-Help {
+    param([Parameter(ValueFromPipeline=$true)][string]$Name)
+    try {
+        $cmd = Get-Command $Name -ErrorAction Stop
+        Write-Output `"`nNAME`"
+        Write-Output `"    $($cmd.Name)`"
+        Write-Output `"`nSYNOPSIS`"
+        Write-Output `"    (Native Android Host - Offline Syntax Only)`"
+        Write-Output `"`nSYNTAX`"
+        Write-Output `"    $($cmd.Syntax)`"
+        Write-Output `"`nPARAMETERS`"
+        foreach ($p in $cmd.Parameters.Values) {
+            Write-Output `"    -$($p.Name) <$($p.ParameterType.Name)>`"
+        }
+        Write-Output `"`n`"
+    } catch {
+        Write-Output `"Help: Command '$Name' not found.`"
+    }
+}
+Set-Alias help Get-Help
+";
+                File.WriteAllText(profilePath, defaultProfile.Trim());
+            }
+
+            // Dot-source the profile into the runspace
+            _ps.AddScript($". '{profilePath}'").Invoke();
             _ps.Commands.Clear();
             
-            SendToReact("PowerShell 7.6.1 Preview Engine (Native Android Sandbox)\n");
+            SendToReact("PowerShell 7.6.1 Engine Initialized (Native Android Sandbox)\n");
         }
         catch (Exception ex)
         {
@@ -95,8 +148,8 @@ public class MainActivity : Activity
 
     public void ExecuteCommand(string command)
     {
-        if (!_isReactReady) NotifyReactReady(); // Failsafe: if user types, React is obviously awake!
         if (_ps == null) { SendToReact("Error: PowerShell engine is still initializing...\n"); return; }
+        if (!_isReactReady) NotifyReactReady(); // Failsafe
 
         Task.Run(() => 
         {
@@ -124,7 +177,6 @@ public class MainActivity : Activity
     public void NotifyReactReady()
     {
         _isReactReady = true;
-        // The second React says "I'm ready", dump everything we've been saving up!
         while (_outputQueue.Count > 0)
         {
             SendToReact(_outputQueue.Dequeue());
@@ -164,4 +216,3 @@ public class PwshBridge : Java.Lang.Object
     [JavascriptInterface]
     public void MinimizeApp() { _activity.MoveTaskToBack(true); }
 }
-
