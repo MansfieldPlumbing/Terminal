@@ -1,0 +1,26 @@
+# .NET / MSBuild
+bin/
+obj/
+*.user
+*.suo
+*.log
+
+# Android / Native
+*.apk
+*.aab
+libs/arm64-v8a/libpsl-native.so
+
+# Node / React
+ReactUI/node_modules/
+ReactUI/dist/
+.env
+.env.local
+.env.*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS / Editor
+.DS_Store
+.vscode/
+.idea/
