@@ -12,7 +12,7 @@ using System.Management.Automation.Runspaces;
 using System.Management.Automation.Provider;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.IO; // Added for File operations
+using System.IO;
 
 namespace TerminalApp;
 
@@ -82,12 +82,11 @@ public class MainActivity : Activity
 
             _ps = PowerShell.Create(iss);
             
-            // Set Native Path
             string appBasePath = this.FilesDir.AbsolutePath;
             _ps.AddCommand("Set-Location").AddParameter("Path", appBasePath).Invoke();
             _ps.Commands.Clear();
 
-            // --- PROFILE MANAGEMENT ---
+            // --- C# ESCAPED PROFILE ---
             string profilePath = Path.Combine(appBasePath, "profile.ps1");
             if (!File.Exists(profilePath))
             {
@@ -114,19 +113,20 @@ function Get-Help {
     param([Parameter(ValueFromPipeline=$true)][string]$Name)
     try {
         $cmd = Get-Command $Name -ErrorAction Stop
-        Write-Output `"`nNAME`"
-        Write-Output `"    $($cmd.Name)`"
-        Write-Output `"`nSYNOPSIS`"
-        Write-Output `"    (Native Android Host - Offline Syntax Only)`"
-        Write-Output `"`nSYNTAX`"
-        Write-Output `"    $($cmd.Syntax)`"
-        Write-Output `"`nPARAMETERS`"
+        Write-Output ''
+        Write-Output 'NAME'
+        Write-Output ""    $($cmd.Name)""
+        Write-Output 'SYNOPSIS'
+        Write-Output '    (Native Android Host - Offline Syntax Only)'
+        Write-Output 'SYNTAX'
+        Write-Output ""    $($cmd.Syntax)""
+        Write-Output 'PARAMETERS'
         foreach ($p in $cmd.Parameters.Values) {
-            Write-Output `"    -$($p.Name) <$($p.ParameterType.Name)>`"
+            Write-Output ""    -$($p.Name) <$($p.ParameterType.Name)>""
         }
-        Write-Output `"`n`"
+        Write-Output ''
     } catch {
-        Write-Output `"Help: Command '$Name' not found.`"
+        Write-Output ""Help: Command '$Name' not found.""
     }
 }
 Set-Alias help Get-Help
@@ -134,11 +134,10 @@ Set-Alias help Get-Help
                 File.WriteAllText(profilePath, defaultProfile.Trim());
             }
 
-            // Dot-source the profile into the runspace
             _ps.AddScript($". '{profilePath}'").Invoke();
             _ps.Commands.Clear();
             
-            SendToReact("PowerShell 7.6.1 Engine Initialized (Native Android Sandbox)\n");
+            SendToReact("PowerShell 7.6.1 Preview Engine (Native Android Sandbox)\n");
         }
         catch (Exception ex)
         {
@@ -149,7 +148,7 @@ Set-Alias help Get-Help
     public void ExecuteCommand(string command)
     {
         if (_ps == null) { SendToReact("Error: PowerShell engine is still initializing...\n"); return; }
-        if (!_isReactReady) NotifyReactReady(); // Failsafe
+        if (!_isReactReady) NotifyReactReady();
 
         Task.Run(() => 
         {
