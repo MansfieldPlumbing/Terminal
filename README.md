@@ -1,6 +1,8 @@
 # Terminal
 **A Micro-Frontend Operating Environment for Android, powered by .NET 11 and PowerShell 7.6.1.**
 
+! This is a high velocity project so please be patient!
+
 > *A self-contained Android APK that hosts the raw Microsoft PowerShell SDK as a live, interactive background engine — no Linux layer, no chroot, no proot, no Termux dependency. Just PowerShell, running natively inside an Android process.*
 
 ---
