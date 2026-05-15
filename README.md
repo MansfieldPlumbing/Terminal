@@ -5,7 +5,8 @@
 
 ---
 
-<img width="1080" height="2340" alt="image" src="https://github.com/user-attachments/assets/2520084a-6c3e-4224-abc0-6588a36db0ac" />
+<img width="2340" height="1080" alt="Screen_Recording_20260515_152525~2" src="https://github.com/user-attachments/assets/2e9e9874-0d59-4ac7-85be-872d104fc68b" />
+
 
 ---
 
