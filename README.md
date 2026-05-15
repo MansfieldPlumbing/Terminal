@@ -1,4 +1,4 @@
-# Terminal — Android-Terminal
+# Terminal
 **A Micro-Frontend Operating Environment for Android, powered by .NET 11 and PowerShell 7.6.1.**
 
 > *A self-contained Android APK that hosts the raw Microsoft PowerShell SDK as a live, interactive background engine — no Linux layer, no chroot, no proot, no Termux dependency. Just PowerShell, running natively inside an Android process.*
@@ -7,7 +7,7 @@
 
 ## What This Is
 
-TerminalNT is an experiment in what Android can actually do when you stop asking permission from its intended application model. It embeds the full `Microsoft.PowerShell.SDK` NuGet package directly into an ARM64 APK, boots a persistent PowerShell 7.6.1 Runspace in a background thread, and surfaces it through a React/Vite web frontend hosted inside an Android WebView — communicating bidirectionally via a Base64 JSON bridge.
+Android-Terminal is an experiment in what Android can actually do when you stop asking permission from its intended application model. It embeds the full `Microsoft.PowerShell.SDK` NuGet package directly into an ARM64 APK, boots a persistent PowerShell 7.6.1 Runspace in a background thread, and surfaces it through a React/Vite web frontend hosted inside an Android WebView — communicating bidirectionally via a Base64 JSON bridge.
 
 The result is a real, interactive PowerShell terminal on your Android device. Not a remote session into another machine. Not a shell emulator. The engine is running in-process, on the device, in your pocket.
 
