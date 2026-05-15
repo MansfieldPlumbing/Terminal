@@ -5,6 +5,10 @@
 
 ---
 
+<img width="1080" height="2340" alt="image" src="https://github.com/user-attachments/assets/2520084a-6c3e-4224-abc0-6588a36db0ac" />
+
+---
+
 ## What This Is
 
 Android-Terminal is an experiment in what Android can actually do when you stop asking permission from its intended application model. It embeds the full `Microsoft.PowerShell.SDK` NuGet package directly into an ARM64 APK, boots a persistent PowerShell 7.6.1 Runspace in a background thread, and surfaces it through a React/Vite web frontend hosted inside an Android WebView — communicating bidirectionally via a Base64 JSON bridge.
