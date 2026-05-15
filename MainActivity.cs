@@ -19,8 +19,8 @@ namespace TerminalApp;
 [Activity(Label = "Terminal", MainLauncher = true, Theme = "@android:style/Theme.NoTitleBar.Fullscreen")]
 public class MainActivity : Activity
 {
-    private WebView _webView;
-    private PowerShell _ps;
+    private WebView _webView = null!;
+    private PowerShell _ps = null!;
     private bool _isReactReady = false;
     private Queue<string> _outputQueue = new Queue<string>();
 
@@ -36,6 +36,7 @@ public class MainActivity : Activity
         _webView.Settings.AllowUniversalAccessFromFileURLs = true;
         _webView.Settings.MediaPlaybackRequiresUserGesture = false;
 
+        // THE MISSING LINK: Intercept PowerShell's native calls and route them to the dummy Android lib!
         NativeLibrary.SetDllImportResolver(typeof(System.Management.Automation.PowerShell).Assembly, (libraryName, assembly, searchPath) =>
         {
             if (libraryName.Contains("libpsl-native"))
@@ -82,11 +83,11 @@ public class MainActivity : Activity
 
             _ps = PowerShell.Create(iss);
             
-            string appBasePath = this.FilesDir.AbsolutePath;
+            string appBasePath = this.FilesDir!.AbsolutePath;
             _ps.AddCommand("Set-Location").AddParameter("Path", appBasePath).Invoke();
             _ps.Commands.Clear();
 
-            // --- C# ESCAPED PROFILE ---
+            // RESTORED: Bootstrap Profile (Aliases & Offline Help)
             string profilePath = Path.Combine(appBasePath, "profile.ps1");
             if (!File.Exists(profilePath))
             {
@@ -137,7 +138,7 @@ Set-Alias help Get-Help
             _ps.AddScript($". '{profilePath}'").Invoke();
             _ps.Commands.Clear();
             
-            SendToReact("PowerShell 7.6.1 Preview Engine (Native Android Sandbox)\n");
+            SendToReact("PowerShell 7.6.1 Engine Initialized (Native Android Sandbox)\n");
         }
         catch (Exception ex)
         {

@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Metro UI File Explorer Applet</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.344.0"
+      }
+    }
+  </script>
+
+  <style>
+    @layer utilities { .contain-strict { contain: strict; } }
+    body { margin: 0; background: #000; color: #fff; font-family: 'Segoe UI', system-ui, sans-serif; overflow: hidden; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: #191919; }
+    ::-webkit-scrollbar-thumb { background: #333; border: 2px solid #191919; border-radius: 5px; }
+    ::-webkit-scrollbar-thumb:hover { background: #555; }
+    ::-webkit-scrollbar-corner { background: #191919; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" data-presets="react" data-type="module">
+    import React, { useState, useEffect, useCallback } from 'react';
+    import { createRoot } from 'react-dom/client';
+    import { 
+      Menu, ArrowUp, ChevronDown, Monitor, 
+      LayoutGrid, List, FolderPlus, Copy, CheckSquare, 
+      Search, MoreHorizontal, File as FileIcon,
+      Download, Image as ImageIcon, Music, Film, Network, HardDrive, Trash2, FolderOpen
+    } from 'lucide-react';
+
+    const formatSize = (bytes) => {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    };
+
+    const formatDate = (timestamp) => new Date(timestamp).toLocaleDateString();
+
+    const SolidFolderIcon = ({ className }) => (
+      <svg className={className} viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+        <path d="M224,72H141.3L118.6,49.3A15.9,15.9,0,0,0,107.3,44.6H32A16,16,0,0,0,16,60.6V208a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V88A16,16,0,0,0,224,72Z" fill="#FCE166" />
+      </svg>
+    );
+
+    function App() {
+      const [sidebarExpanded, setSidebarExpanded] = useState(false);
+      const [rootHandle, setRootHandle] = useState(null);
+      const [pathStack, setPathStack] = useState([]);
+      const [items, setItems] = useState([]);
+      const [selectedNames, setSelectedNames] = useState(new Set());
+      const [viewMode, setViewMode] = useState('grid');
+      const [sortMode, setSortMode] = useState('name');
+      const [isLoading, setIsLoading] = useState(false);
+      const [storageInfo, setStorageInfo] = useState({ usage: 0, quota: 0 });
+
+      useEffect(() => {
+        if (navigator.storage && navigator.storage.estimate) {
+          navigator.storage.estimate().then(({ usage, quota }) => {
+            setStorageInfo({ usage: usage || 0, quota: quota || 0 });
+          });
+        }
+      }, []);
+
+      const currentHandle = pathStack[pathStack.length - 1];
+
+      useEffect(() => {
+        return () => {
+          items.forEach(item => { if (item.thumbnailUrl) URL.revokeObjectURL(item.thumbnailUrl); });
+        };
+      }, [items]);
+
+      const loadDirectory = useCallback(async (dirHandle) => {
+        setIsLoading(true);
+        setSelectedNames(new Set());
+        try {
+          const newItems = [];
+          setItems(oldItems => {
+            oldItems.forEach(i => { if (i.thumbnailUrl) URL.revokeObjectURL(i.thumbnailUrl); });
+            return [];
+          });
+
+          for await (const entry of dirHandle.values()) {
+            newItems.push({ handle: entry, name: entry.name, kind: entry.kind });
+          }
+
+          newItems.sort((a, b) => {
+            if (a.kind === b.kind) return a.name.localeCompare(b.name);
+            return a.kind === 'directory' ? -1 : 1;
+          });
+
+          setItems([...newItems]);
+
+          const enrichItems = async () => {
+            const enriched = [...newItems];
+            for (let i = 0; i < enriched.length; i++) {
+              const item = enriched[i];
+              if (item.kind === 'file') {
+                try {
+                  const file = await item.handle.getFile();
+                  item.size = file.size; item.lastModified = file.lastModified;
+                  if (file.type.startsWith('image/')) item.thumbnailUrl = URL.createObjectURL(file);
+                } catch (e) { console.error("Failed to read details for", item.name); }
+              }
+            }
+            setItems([...enriched]);
+          };
+          enrichItems();
+
+        } catch (e) {
+          console.error("Error loading directory", e);
+        } finally {
+          setIsLoading(false);
+        }
+      }, []);
+
+      const handleOpenRoot = async (startIn) => {
+        try {
+          if (!window.showDirectoryPicker) return alert("File System Access API is not mapped by the WebView.");
+          const options = startIn ? { startIn, mode: 'readwrite' } : { mode: 'readwrite' };
+          const handle = await window.showDirectoryPicker(options);
+          setRootHandle(handle); setPathStack([handle]); loadDirectory(handle);
+        } catch (e) {}
+      };
+
+      const handleNavigateDown = (handle) => { setPathStack(prev => [...prev, handle]); loadDirectory(handle); };
+      const handleNavigateUp = () => {
+        if (pathStack.length > 1) {
+          const newStack = pathStack.slice(0, -1);
+          setPathStack(newStack); loadDirectory(newStack[newStack.length - 1]);
+        }
+      };
+
+      const toggleSelection = (name, multi) => {
+        setSelectedNames(prev => {
+          const isMulti = multi || prev.size > 0;
+          const next = new Set(isMulti ? prev : []);
+          if (next.has(name)) next.delete(name); else next.add(name);
+          return next;
+        });
+      };
+
+      const selectAll = () => {
+        if (selectedNames.size === items.length) setSelectedNames(new Set());
+        else setSelectedNames(new Set(items.map(i => i.name)));
+      };
+
+      const handleDelete = async () => {
+        if (!currentHandle || selectedNames.size === 0) return;
+        if (!confirm(\`Are you sure you want to delete \${selectedNames.size} item(s)?\`)) return;
+        for (const name of selectedNames) {
+          const item = items.find(i => i.name === name);
+          if (item) {
+            try { await currentHandle.removeEntry(name, { recursive: item.kind === 'directory' }); }
+            catch (e) { alert(\`Failed to delete \${name}.\`); }
+          }
+        }
+        loadDirectory(currentHandle);
+      };
+
+      const handleCreateFolder = async () => {
+        if (!currentHandle) return;
+        const name = prompt("Enter folder name:");
+        if (!name) return;
+        try { await currentHandle.getDirectoryHandle(name, { create: true }); loadDirectory(currentHandle); }
+        catch (e) { alert("Failed to create folder."); }
+      };
+
+      const handleItemTap = (e, item) => {
+        const target = e.currentTarget; const now = Date.now();
+        const lastTap = parseInt(target.dataset.lastTap || '0', 10);
+        if (now - lastTap < 300) {
+          if (item.kind === 'directory') handleNavigateDown(item.handle);
+          target.dataset.lastTap = '0';
+        } else {
+          toggleSelection(item.name, e.ctrlKey || e.metaKey || e.shiftKey);
+          target.dataset.lastTap = now.toString();
+        }
+      };
+
+      const sortedItems = [...items].sort((a, b) => {
+        if (a.kind !== b.kind) return a.kind === 'directory' ? -1 : 1;
+        if (sortMode === 'name') return a.name.localeCompare(b.name);
+        return (b.lastModified || 0) - (a.lastModified || 0);
+      });
+
+      const SidebarItem = ({ icon: Icon, label, onClick, isActive = false }) => (
+        <div className={\`h-11 flex items-center px-[16px] cursor-pointer relative group transition-colors overflow-hidden shrink-0 \${isActive ? 'bg-[#0078D7] hover:bg-[#006cc1]' : 'hover:bg-[#2d2d2d]'}\`} onClick={onClick}>
+          {isActive && <div className="absolute left-0 top-2 bottom-2 w-[3px] bg-blue-300 rounded-r-full" />}
+          <Icon size={18} strokeWidth={1.5} className={\`shrink-0 \${!isActive ? 'text-neutral-400' : ''}\`} />
+          {sidebarExpanded && <span className={\`ml-4 text-[14px] truncate \${!isActive ? 'text-neutral-300' : 'text-white'}\`}>{label}</span>}
+        </div>
+      );
+
+      const selectedItem = selectedNames.size === 1 ? items.find(i => i.name === Array.from(selectedNames)[0]) : null;
+
+      return (
+        <div className="flex h-screen bg-black text-white font-sans overflow-hidden select-none">
+          <div className={\`\${sidebarExpanded ? 'w-64' : 'w-[52px] items-center'} flex flex-col bg-[#191919] transition-all duration-200 z-10 shrink-0 border-r border-[#2d2d2d] overflow-y-auto overflow-x-hidden\`}>
+            <div className="h-12 flex items-center px-4 hover:bg-[#2d2d2d] cursor-pointer shrink-0" onClick={() => setSidebarExpanded(!sidebarExpanded)}>
+              <Menu size={20} className="shrink-0" />
+            </div>
+            <div className="flex-1 flex flex-col mt-2">
+              {sidebarExpanded && <div className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider px-4 mt-2 mb-2">Storage</div>}
+              <SidebarItem icon={Monitor} label="Internal Storage" onClick={() => handleOpenRoot()} isActive={!!rootHandle} />
+              <SidebarItem icon={HardDrive} label="SD Card" onClick={() => handleOpenRoot()} />
+              <SidebarItem icon={Network} label="Network / Workgroup" onClick={() => handleOpenRoot()} />
+              {sidebarExpanded && <div className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider px-4 mt-6 mb-2">Categories</div>}
+              <SidebarItem icon={Download} label="Downloads" onClick={() => handleOpenRoot('downloads')} />
+              <SidebarItem icon={ImageIcon} label="Images" onClick={() => handleOpenRoot('pictures')} />
+              <SidebarItem icon={Film} label="Videos" onClick={() => handleOpenRoot('videos')} />
+              <SidebarItem icon={Music} label="Audio" onClick={() => handleOpenRoot('music')} />
+              <SidebarItem icon={FileIcon} label="Documents" onClick={() => handleOpenRoot('documents')} />
+            </div>
+            {storageInfo.quota > 0 && sidebarExpanded && (
+               <div className="p-4 mt-auto border-t border-[#2d2d2d]">
+                  <div className="flex justify-between text-[11px] text-neutral-400 mb-1.5">
+                     <span>{formatSize(storageInfo.usage)}</span><span>{formatSize(storageInfo.quota)}</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-[#333] rounded-full overflow-hidden">
+                     <div className="h-full bg-[#0078D7]" style={{ width: \`\${Math.min(100, (storageInfo.usage / storageInfo.quota) * 100)}%\` }} />
+                  </div>
+                  <div className="text-[11px] text-neutral-500 mt-1">Storage usage</div>
+               </div>
+            )}
+          </div>
+          <div className="flex-1 flex flex-col min-w-0 bg-black">
+            <div className="flex items-center h-12 px-2 gap-4 border-b border-[#111] shrink-0">
+               <button className={\`p-2 hover:bg-[#191919] rounded-md transition-colors \${pathStack.length <= 1 ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}\`} onClick={handleNavigateUp} disabled={pathStack.length <= 1}>
+                 <ArrowUp size={18} strokeWidth={1.5} />
+               </button>
+               <h1 className="text-[14px] font-medium flex-1 truncate">{currentHandle ? currentHandle.name : 'Files'}</h1>
+            </div>
+            <div className="flex items-center px-4 h-12 gap-4 text-xs text-neutral-400 border-b border-[#111] shrink-0">
+               <button className="flex items-center gap-1.5 hover:text-white group transition-colors" onClick={() => setSortMode(s => s === 'name' ? 'date' : 'name')}>
+                  Sort by: {sortMode === 'name' ? 'Name' : 'Date'}<ChevronDown size={14} className="opacity-70 group-hover:opacity-100" />
+               </button>
+               <div className="flex-1" />
+               {selectedNames.size > 0 && <div className="text-[#0078D7] font-medium">{selectedNames.size} item(s) selected</div>}
+            </div>
+            <div className="flex-1 overflow-y-auto outline-none contain-strict" tabIndex={0} onClick={(e) => { if (e.target.closest('.item-container') === null) setSelectedNames(new Set()); }}>
+              {!rootHandle ? (
+                <div className="flex flex-col items-center justify-center h-full text-neutral-500 text-center px-6">
+                   <HardDrive size={64} strokeWidth={1} className="mb-6 opacity-20" />
+                   <p className="mb-6 text-sm max-w-sm">Pick a storage location or category from the left to explore files.</p>
+                   <button onClick={() => handleOpenRoot()} className="px-6 py-2 bg-[#0078D7] text-white text-sm hover:bg-[#006cc1] shadow-md transition-colors border border-[#ffffff10] rounded">Browse storage...</button>
+                </div>
+              ) : items.length === 0 && !isLoading ? (
+                 <div className="flex items-center justify-center h-full text-neutral-500 text-sm">This folder is empty.</div>
+              ) : (
+                <div className="p-4">
+                  {viewMode === 'grid' ? (
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-2">
+                      {sortedItems.map((item) => {
+                        const isSelected = selectedNames.has(item.name);
+                        return (
+                        <div key={item.name} className={\`item-container group flex flex-col items-center p-3 rounded-md cursor-pointer border transition-all \${isSelected ? 'bg-[#0078D7]/20 border-[#0078D7]' : 'border-transparent hover:bg-[#ffffff10] hover:border-[#ffffff15]'}\`} onClick={(e) => handleItemTap(e, item)}>
+                          <div className="w-16 h-16 flex items-center justify-center mb-3 pointer-events-none">
+                             {item.kind === 'directory' ? <SolidFolderIcon className="w-full h-full" /> : item.thumbnailUrl ? <div className="w-full h-full rounded shadow-[0_2px_4px_rgba(0,0,0,0.5)] overflow-hidden bg-[#222] flex items-center justify-center"><img src={item.thumbnailUrl} alt={item.name} className="max-w-full max-h-full object-cover" /></div> : <FileIcon size={48} className="text-neutral-500 stroke-[1]" />}
+                          </div>
+                          <span className="text-[12px] text-center break-words w-full line-clamp-2 leading-tight pointer-events-none">{item.name}</span>
+                          {item.kind === 'file' && item.size !== undefined && <span className="text-[10px] text-neutral-500 mt-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">{formatSize(item.size)}</span>}
+                        </div>
+                      )})}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col min-w-[500px]">
+                      <div className="grid grid-cols-[minmax(250px,2fr)_1fr_1fr] px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-neutral-500 border-b border-[#2d2d2d] mb-1">
+                        <div>Name</div><div>Date modified</div><div>Size</div>
+                      </div>
+                      {sortedItems.map((item) => {
+                        const isSelected = selectedNames.has(item.name);
+                        return (
+                        <div key={item.name} className={\`item-container grid grid-cols-[minmax(250px,2fr)_1fr_1fr] items-center px-3 py-2 cursor-pointer text-[13px] gap-4 transition-colors border border-transparent \${isSelected ? 'bg-[#0078D7]/20 border-[#0078D7]' : 'hover:bg-[#ffffff10] hover:border-[#ffffff15]'}\`} onClick={(e) => handleItemTap(e, item)}>
+                          <div className="flex items-center gap-3 truncate pointer-events-none">
+                            {item.kind === 'directory' ? <SolidFolderIcon className="w-[18px] h-[18px] shrink-0" /> : <FileIcon size={16} className="text-neutral-400 shrink-0 stroke-[1.5]" />}
+                            <span className="truncate">{item.name}</span>
+                          </div>
+                          <div className="text-neutral-500 truncate text-[12px] pointer-events-none">{item.lastModified ? formatDate(item.lastModified) : ''}</div>
+                          <div className="text-neutral-500 truncate text-[12px] pointer-events-none">{item.kind === 'file' && item.size !== undefined ? formatSize(item.size) : ''}</div>
+                        </div>
+                      )})}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="h-16 bg-[#1a1a1a] flex items-center justify-center px-4 gap-2 text-neutral-400 shrink-0">
+               <button className={\`w-10 h-10 flex items-center justify-center rounded-md hover:bg-[#333] hover:text-white transition-colors \${viewMode === 'list' ? 'bg-[#333] text-white' : ''}\`} onClick={() => setViewMode('list')} title="List View"><List size={20} strokeWidth={1.5} /></button>
+               <button className={\`w-10 h-10 flex items-center justify-center rounded-md hover:bg-[#333] hover:text-white transition-colors \${viewMode === 'grid' ? 'bg-[#333] text-white' : ''}\`} onClick={() => setViewMode('grid')} title="Grid View"><LayoutGrid size={20} strokeWidth={1.5} /></button>
+               <div className="w-[1px] h-6 bg-[#333] mx-3" />
+               <button className={\`w-10 h-10 flex items-center justify-center rounded-md transition-colors \${!currentHandle ? 'opacity-30 cursor-not-allowed' : 'hover:bg-[#333] hover:text-white'}\`} title="New Folder" onClick={handleCreateFolder} disabled={!currentHandle}><FolderPlus size={20} strokeWidth={1.5} /></button>
+               {selectedItem?.kind === 'directory' && <button className="w-10 h-10 flex items-center justify-center rounded-md hover:bg-[#333] hover:text-white transition-colors text-[#0078D7]" title="Open Folder" onClick={() => handleNavigateDown(selectedItem.handle)}><FolderOpen size={20} strokeWidth={1.5} /></button>}
+               <button className={\`w-10 h-10 flex items-center justify-center rounded-md transition-colors \${selectedNames.size === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-[#333] hover:text-white'}\`} title="Delete Selected" onClick={handleDelete} disabled={selectedNames.size === 0}><Trash2 size={20} strokeWidth={1.5} className={selectedNames.size > 0 ? "text-red-400" : ""} /></button>
+               <button className="w-10 h-10 flex items-center justify-center rounded-md hover:bg-[#333] hover:text-white transition-colors" title="Select All" onClick={selectAll} disabled={!currentHandle || items.length === 0}><CheckSquare size={20} strokeWidth={1.5} /></button>
+               <div className="flex-1" />
+               <button className="w-10 h-10 flex items-center justify-center rounded-md hover:bg-[#333] hover:text-white transition-colors" title="Search"><Search size={20} strokeWidth={1.5} /></button>
+               <button className="w-10 h-10 flex items-center justify-center rounded-md hover:bg-[#333] hover:text-white transition-colors" title="More"><MoreHorizontal size={20} strokeWidth={1.5} /></button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const root = createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

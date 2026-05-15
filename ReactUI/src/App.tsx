@@ -1,928 +1,314 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { 
-  Terminal, Code2, Play, AppWindow,
-  MonitorPlay, Cpu, Network, Video, Plus, Lock, Server, TerminalSquare,
-  FileCode2, CheckSquare, Settings2, ChevronRight, Minus, Square, X, Menu
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-import { executeCommand, subscribeToOutput, minimizeAppFromBridge } from './lib/pwshBridge';
-
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
-
-function Thumbstick({ view, setView }: { view: string, setView: (v: any) => void }) {
-  const baseRef = useRef<HTMLDivElement>(null);
-  const nubRef = useRef<HTMLDivElement>(null);
-  
-  const [pos, setPos] = useState({ x: 24, y: 0 });
-  const modeRef = useRef<'idle' | 'move' | 'flick'>('idle');
-  const startRef = useRef({ x: 0, y: 0 });
-  const offsetRef = useRef({ x: 0, y: 0 });
-  const lastDragPosRef = useRef({ x: 0, y: 0 });
-
-  const [fancyZone, setFancyZone] = useState<'left' | 'right' | null>(null);
-  const [nestledState, setNestledState] = useState<'left' | 'right' | null>(null);
-  const nestledRef = useRef<'left' | 'right' | null>(null);
-
-  const setNestled = useCallback((val: 'left' | 'right' | null) => {
-    nestledRef.current = val;
-    setNestledState(val);
-  }, []);
-
-  useEffect(() => {
-    setPos({ x: window.innerWidth - 110, y: window.innerHeight - 154 });
-  }, []);
-
-  const onPointerDown = useCallback((e: React.PointerEvent) => {
-    const el = baseRef.current;
-    if (!el) return;
-
-    if (nestledRef.current) {
-      const wasNestled = nestledRef.current;
-      setPos(p => ({
-        x: wasNestled === 'left' ? 32 : window.innerWidth - 162,
-        y: p.y
-      }));
-      setNestled(null);
-    }
-
-    el.setPointerCapture(e.pointerId);
-    startRef.current = { x: e.clientX, y: e.clientY };
-    offsetRef.current = { x: 0, y: 0 };
-    lastDragPosRef.current = { x: e.clientX, y: e.clientY };
-    
-    if (nubRef.current && nubRef.current.contains(e.target as Node)) {
-      modeRef.current = 'flick';
-      el.style.transitionProperty = 'background, box-shadow';
-    } else {
-      modeRef.current = 'move';
-      el.style.transitionProperty = 'background, transform, box-shadow';
-      el.style.transform = 'scale(1.05)';
-      el.style.background = 'rgba(40, 40, 40, 0.5)';
-      if (navigator.vibrate) navigator.vibrate(50);
-    }
-  }, []);
-
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
-    if (nestledRef.current) return;
-
-    if (modeRef.current === 'move') {
-      const dx = e.clientX - lastDragPosRef.current.x;
-      const dy = e.clientY - lastDragPosRef.current.y;
-      lastDragPosRef.current = { x: e.clientX, y: e.clientY };
-      
-      setPos(p => {
-        const nx = p.x + dx;
-        const ny = p.y + dy;
-        const cx = nx + 130 / 2;
-        if (cx < 24) setFancyZone('left');
-        else if (cx > window.innerWidth - 24) setFancyZone('right');
-        else setFancyZone(null);
-        return { x: nx, y: ny };
-      });
-    } else if (modeRef.current === 'flick') {
-      const MAX = 40;
-      let nx = e.clientX - startRef.current.x;
-      let ny = e.clientY - startRef.current.y;
-      const dist = Math.sqrt(nx*nx + ny*ny);
-      if (dist > MAX) {
-        nx = (nx / dist) * MAX;
-        ny = (ny / dist) * MAX;
-      }
-      offsetRef.current = { x: nx, y: ny };
-      if (nubRef.current) {
-        nubRef.current.style.transform = `translate(${nx}px, ${ny}px)`;
-      }
-    }
-  }, []);
-
-  const onPointerUp = useCallback((e: React.PointerEvent) => {
-    setFancyZone(null);
-    if (nestledRef.current) return;
-
-    const el = baseRef.current;
-    if (!el) return;
-    if (el.hasPointerCapture(e.pointerId)) {
-      el.releasePointerCapture(e.pointerId);
-    }
-    
-    el.style.background = 'rgba(26, 26, 26, 0.4)';
-    el.style.transform = 'scale(1)';
-
-    if (modeRef.current === 'move') {
-      el.style.transitionProperty = 'all';
-      setFancyZone(null);
-      setPos(p => {
-        const cx = p.x + 130 / 2;
-        let targetY = p.y;
-        if (targetY < 24) targetY = 24;
-        if (targetY > window.innerHeight - 154) targetY = window.innerHeight - 154;
-
-        if (cx < 24) {
-          // Schedule setNestled so it's not inside setPos updater
-          setTimeout(() => setNestled('left'), 0);
-          return { x: -65, y: targetY };
-        } else if (cx > window.innerWidth - 24) {
-          setTimeout(() => setNestled('right'), 0);
-          return { x: window.innerWidth - 65, y: targetY };
-        }
-
-        let targetX = p.x;
-        if (targetX < 10) targetX = 10;
-        if (targetX > window.innerWidth - 140) targetX = window.innerWidth - 140;
-
-        return { x: targetX, y: targetY };
-      });
-    } else if (modeRef.current === 'flick') {
-      el.style.transitionProperty = 'all';
-      const absX = Math.abs(offsetRef.current.x);
-      const absY = Math.abs(offsetRef.current.y);
-      
-      if (absX > 20 || absY > 20) {
-        if (absX > absY) {
-          if (offsetRef.current.x < 0) setView(view === 'right' ? 'center' : 'left');
-          else setView(view === 'left' ? 'center' : 'right');
-        } else {
-          if (offsetRef.current.y < 0) setView(view === 'bottom' ? 'center' : 'top');
-          else setView(view === 'top' ? 'center' : 'bottom');
-        }
-      } else {
-        setView('center');
-      }
-    } else if (modeRef.current === 'idle') {
-       el.style.transitionProperty = 'all';
-       setView('center');
-    }
-    
-    if (nubRef.current) {
-      nubRef.current.style.transition = 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)';
-      nubRef.current.style.transform = `translate(0px, 0px)`;
-      setTimeout(() => { if (nubRef.current) nubRef.current.style.transition = 'none'; }, 300);
-    }
-    
-    modeRef.current = 'idle';
-  }, [view, setView, setNestled]);
-
-  const isNestled = nestledState !== null;
-
-  return (
-    <>
-      {/* Fancy Zones */}
-      <div 
-        className={cn("fixed top-0 bottom-0 left-0 w-8 bg-blue-500/20 transition-opacity pointer-events-none z-40 border-r border-blue-500/30", 
-          fancyZone === 'left' ? "opacity-100" : "opacity-0")} 
-      />
-      <div 
-        className={cn("fixed top-0 bottom-0 right-0 w-8 bg-blue-500/20 transition-opacity pointer-events-none z-40 border-l border-blue-500/30", 
-          fancyZone === 'right' ? "opacity-100" : "opacity-0")} 
-      />
-
-      <div 
-        ref={baseRef}
-        className="fixed z-50 rounded-full flex touch-none transition-all duration-200 ease-out select-none"
-        style={{ 
-          width: 130, 
-          height: 130, 
-          left: pos.x, 
-          top: pos.y, 
-          background: isNestled ? 'transparent' : 'rgba(26, 26, 26, 0.4)', 
-          backdropFilter: isNestled ? 'none' : 'blur(16px)',
-          WebkitBackdropFilter: isNestled ? 'none' : 'blur(16px)',
-          border: isNestled ? '1px solid transparent' : '1px solid rgba(255, 255, 255, 0.1)', 
-          boxShadow: isNestled ? 'none' : '0 8px 32px rgba(0, 0, 0, 0.3)',
-          cursor: isNestled ? 'default' : 'grab',
-          pointerEvents: isNestled ? 'none' : 'auto'
-        }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-      >
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div 
-            ref={nubRef}
-            className={cn("w-14 h-14 bg-[#121212] rounded-full flex items-center justify-center shadow-inner border border-white/10 pointer-events-auto active:cursor-grabbing",
-              isNestled ? "cursor-pointer" : "cursor-grab")}
-          >
-            <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
-function HamburgerStick({ view, setView, isMenuOpen, setIsMenuOpen }: { view: string, setView: (v: any) => void, isMenuOpen: boolean, setIsMenuOpen: (v: boolean) => void }) {
-  const baseRef = useRef<HTMLDivElement>(null);
-  const nubRef = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  
-  const [pos, setPos] = useState({ x: 24, y: 0 });
-  const modeRef = useRef<'idle' | 'move'>('idle');
-  const startRef = useRef({ x: 0, y: 0 });
-  const lastDragPosRef = useRef({ x: 0, y: 0 });
-
-  const [fancyZone, setFancyZone] = useState<'left' | 'right' | null>(null);
-  const [nestledState, setNestledState] = useState<'left' | 'right' | null>(null);
-  const nestledRef = useRef<'left' | 'right' | null>(null);
-
-  const setNestled = useCallback((val: 'left' | 'right' | null) => {
-    nestledRef.current = val;
-    setNestledState(val);
-  }, []);
-
-  useEffect(() => {
-    setPos({ x: window.innerWidth - 150, y: window.innerHeight - 150 });
-  }, []);
-
-  useEffect(() => {
-    if (!isMenuOpen) return;
-    const handleClickOutside = (e: PointerEvent) => {
-      if (
-        menuRef.current && 
-        !menuRef.current.contains(e.target as Node) &&
-        baseRef.current &&
-        !baseRef.current.contains(e.target as Node)
-      ) {
-        setIsMenuOpen(false);
-      }
-    };
-    document.addEventListener('pointerdown', handleClickOutside);
-    return () => document.removeEventListener('pointerdown', handleClickOutside);
-  }, [isMenuOpen, setIsMenuOpen]);
-
-  const onPointerDown = useCallback((e: React.PointerEvent) => {
-    const el = baseRef.current;
-    if (!el) return;
-
-    if (nestledRef.current) {
-      const wasNestled = nestledRef.current;
-      setPos(p => ({
-        x: wasNestled === 'left' ? 32 : window.innerWidth - 162,
-        y: p.y
-      }));
-      setNestled(null);
-    }
-
-    el.setPointerCapture(e.pointerId);
-    startRef.current = { x: e.clientX, y: e.clientY };
-    lastDragPosRef.current = { x: e.clientX, y: e.clientY };
-    modeRef.current = 'idle';
-    
-    el.style.transitionProperty = 'background, transform, box-shadow';
-    el.style.transform = 'scale(1.05)';
-    el.style.background = 'rgba(40, 40, 40, 0.5)';
-    if (navigator.vibrate) navigator.vibrate(50);
-  }, [setNestled]);
-
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
-    if (nestledRef.current) return;
-
-    const dx = e.clientX - lastDragPosRef.current.x;
-    const dy = e.clientY - lastDragPosRef.current.y;
-    const distFromStart = Math.sqrt(Math.pow(e.clientX - startRef.current.x, 2) + Math.pow(e.clientY - startRef.current.y, 2));
-
-    if (distFromStart > 5 && modeRef.current === 'idle') {
-      modeRef.current = 'move';
-    }
-
-    if (modeRef.current === 'move') {
-      lastDragPosRef.current = { x: e.clientX, y: e.clientY };
-      
-      setPos(p => {
-        const nx = p.x + dx;
-        const ny = p.y + dy;
-        const cx = nx + 130 / 2;
-        if (cx < 24) setFancyZone('left');
-        else if (cx > window.innerWidth - 24) setFancyZone('right');
-        else setFancyZone(null);
-        return { x: nx, y: ny };
-      });
-    }
-  }, []);
-
-  const onPointerUp = useCallback((e: React.PointerEvent) => {
-    setFancyZone(null);
-    if (nestledRef.current) return;
-
-    const el = baseRef.current;
-    if (!el) return;
-    if (el.hasPointerCapture(e.pointerId)) {
-      el.releasePointerCapture(e.pointerId);
-    }
-    
-    el.style.background = 'rgba(26, 26, 26, 0.4)';
-    el.style.transform = 'scale(1)';
-
-    if (modeRef.current === 'move') {
-      el.style.transitionProperty = 'all';
-      setFancyZone(null);
-      setPos(p => {
-        const cx = p.x + 130 / 2;
-        let targetY = p.y;
-        if (targetY < 24) targetY = 24;
-        if (targetY > window.innerHeight - 154) targetY = window.innerHeight - 154;
-
-        if (cx < 24) {
-          setTimeout(() => setNestled('left'), 0);
-          return { x: -65, y: targetY };
-        } else if (cx > window.innerWidth - 24) {
-          setTimeout(() => setNestled('right'), 0);
-          return { x: window.innerWidth - 65, y: targetY };
-        }
-
-        let targetX = p.x;
-        if (targetX < 10) targetX = 10;
-        if (targetX > window.innerWidth - 140) targetX = window.innerWidth - 140;
-
-        return { x: targetX, y: targetY };
-      });
-    } else if (modeRef.current === 'idle') {
-       el.style.transitionProperty = 'all';
-       setIsMenuOpen(!isMenuOpen);
-    }
-    
-    modeRef.current = 'idle';
-  }, [isMenuOpen, setIsMenuOpen, setNestled]);
-
-  const isNestled = nestledState !== null;
-
-  return (
-    <div className="fixed inset-0 pointer-events-none z-50">
-      {/* Fancy Zones */}
-      <div 
-        className={cn("fixed top-0 bottom-0 left-0 w-8 bg-blue-500/20 transition-opacity pointer-events-none z-40 border-r border-blue-500/30", 
-          fancyZone === 'left' ? "opacity-100" : "opacity-0")} 
-      />
-      <div 
-        className={cn("fixed top-0 bottom-0 right-0 w-8 bg-blue-500/20 transition-opacity pointer-events-none z-40 border-l border-blue-500/30", 
-          fancyZone === 'right' ? "opacity-100" : "opacity-0")} 
-      />
-
-      {/* Menu popup */}
-      <AnimatePresence>
-        {isMenuOpen && (
-          <motion.div
-            ref={menuRef}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className={cn(
-              "fixed w-48 bg-black/40 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden flex flex-col font-sans z-50 pointer-events-auto",
-              pos.x > window.innerWidth / 2 ? (pos.y > window.innerHeight / 2 ? "origin-bottom-right" : "origin-top-right") : (pos.y > window.innerHeight / 2 ? "origin-bottom-left" : "origin-top-left")
-            )}
-            style={{ 
-              top: pos.y > window.innerHeight / 2 ? pos.y - 250 : pos.y + 140, 
-              left: pos.x <= window.innerWidth / 2 ? Math.max(10, pos.x) : 'auto',
-              right: pos.x > window.innerWidth / 2 ? Math.max(10, window.innerWidth - pos.x - 130) : 'auto',
-            }}
-          >
-            <button 
-              onClick={() => { setView('center'); setIsMenuOpen(false); }}
-              className={`px-4 py-3 text-left hover:bg-white/10 transition-colors ${view === 'center' ? 'text-blue-400 font-medium' : 'text-gray-200'}`}
-            >Terminal</button>
-            <div className="h-[1px] bg-white/10 mx-2" />
-            <button 
-              onClick={() => { setView('top'); setIsMenuOpen(false); }}
-              className={`px-4 py-3 text-left hover:bg-white/10 transition-colors ${view === 'top' ? 'text-blue-400 font-medium' : 'text-gray-200'}`}
-            >Profiles</button>
-            <button 
-              onClick={() => { setView('bottom'); setIsMenuOpen(false); }}
-              className={`px-4 py-3 text-left hover:bg-white/10 transition-colors ${view === 'bottom' ? 'text-blue-400 font-medium' : 'text-gray-200'}`}
-            >Settings</button>
-            <button 
-              onClick={() => { setView('left'); setIsMenuOpen(false); }}
-              className={`px-4 py-3 text-left hover:bg-white/10 transition-colors ${view === 'left' ? 'text-blue-400 font-medium' : 'text-gray-200'}`}
-            >Editor & Workspace</button>
-            <button 
-              onClick={() => { setView('right'); setIsMenuOpen(false); }}
-              className={`px-4 py-3 text-left hover:bg-white/10 transition-colors ${view === 'right' ? 'text-blue-400 font-medium' : 'text-gray-200'}`}
-            >Applets</button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div 
-        ref={baseRef}
-        className="fixed z-50 rounded-[2.5rem] flex touch-none transition-all duration-200 ease-out select-none"
-        style={{ 
-          width: 130, 
-          height: 130, 
-          left: pos.x, 
-          top: pos.y, 
-          background: isNestled ? 'transparent' : 'rgba(26, 26, 26, 0.4)', 
-          backdropFilter: isNestled ? 'none' : 'blur(16px)',
-          WebkitBackdropFilter: isNestled ? 'none' : 'blur(16px)',
-          border: isNestled ? '1px solid transparent' : '1px solid rgba(255, 255, 255, 0.1)', 
-          boxShadow: isNestled ? 'none' : '0 8px 32px rgba(0, 0, 0, 0.3)',
-          cursor: isNestled ? 'default' : 'grab',
-          pointerEvents: isNestled ? 'none' : 'auto'
-        }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-      >
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div 
-            ref={nubRef}
-            className={cn("w-14 h-14 bg-black/40 rounded-2xl flex items-center justify-center shadow-inner border border-white/10 pointer-events-auto text-white/90 transition-colors",
-              isNestled ? "cursor-pointer" : "cursor-grab", isMenuOpen && !isNestled ? "bg-white/10 text-white" : "")}
-          >
-            <Menu size={24} />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const TERMINALS = [
-  { id: 'pwsh-7.4', name: 'PowerShell 7.4 (Local)', type: 'pwsh', status: 'Active' },
-  { id: 'pwsh-psrp', name: 'PSRP Node (Remote)', type: 'network', status: 'Idle' },
-  { id: 'cmd', name: 'Command Prompt', type: 'cmd', status: 'Idle' },
-  { id: 'wsl', name: 'Ubuntu (WSL)', type: 'linux', status: 'Stopped' },
-  { id: 'azure', name: 'Azure Cloud Shell', type: 'cloud', status: 'Disconnected' }
-];
-
-const APPLETS = [
-  { id: 'a1', name: 'SystemMonitor.ps1', type: 'ps1', category: 'monitoring' },
-  { id: 'a2', name: 'NetworkScanner.ps1', type: 'ps1', category: 'network' },
-  { id: 'a3', name: 'DockerManager.ps1', type: 'ps1', category: 'tools' },
-  { id: 'a4', name: 'VideoNode.html', type: 'html', category: 'media' },
-  { id: 'a5', name: 'HexViewer.html', type: 'html', category: 'tools' },
-  { id: 'a6', name: 'GitHelper.ps1', type: 'ps1', category: 'tools' }
-];
+import React, { useEffect, useState, useRef } from 'react';
+import { motion, AnimatePresence, Reorder } from 'motion/react';
+import { useAppStore } from './store';
+import TerminalEmulator from './components/TerminalEmulator';
+import Thumbstick from './components/Thumbstick';
+import { Plus, Menu, LayoutTemplate, FileText, FolderTree, Settings2, X } from 'lucide-react';
+import { minimizeAppFromBridge } from './lib/pwshBridge';
+import Notifications from './components/Notifications';
+import FloatingCommandPalette from './components/FloatingCommandPalette';
+import NativeNotepad from './components/NativeNotepad';
+import NativeExplorer from './components/NativeExplorer';
+import SettingsTab from './components/SettingsTab';
+import HamburgerMenuContent from './components/HamburgerMenuContent';
+import { cn } from './lib/utils';
 
 export default function App() {
-  const [view, setView] = useState<'center'|'top'|'bottom'|'left'|'right'>('center');
-  const [navMode, setNavMode] = useState<'joystick'|'hamburger'>('joystick');
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  
-  // Editor State
-  const [editorText, setEditorText] = useState(`function Get-NetworkStats {
-    [CmdletBinding()]
-    param (
-        [string]$InterfaceAlias = '*'
-    )
+  const { 
+    tabs, activeTabId, setActiveTab, addTab, removeTab,
+    commandPaletteVisible, setCommandPaletteVisible,
+    floatingCommandPaletteOpen, setFloatingCommandPaletteOpen,
+    hamburgerMenuOpen, setHamburgerMenuOpen,
+    thumbstickVisible, setThumbstickVisible,
+    autoHideTabs, setAutoHideTabs,
+    micaOpacity, micaBlur
+  } = useAppStore();
 
-    Get-NetAdapterStatistics -Name $InterfaceAlias | 
-    Select-Object Name, ReceivedBytes, SentBytes, ReceivedDiscardedPackets
-}
+  const [tabsVisible, setTabsVisible] = useState(false);
+  const [newTabMenuOpen, setNewTabMenuOpen] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ id: string, x: number, y: number } | null>(null);
 
-# Monitor loop
-while ($true) {
-    Clear-Host
-    Get-NetworkStats | Format-Table -AutoSize
-    Start-Sleep -Seconds 2
-}`);
+  const [plusMenuAnchor, setPlusMenuAnchor] = useState<'left' | 'right'>('left');
+  const plusButtonRef = useRef<HTMLButtonElement>(null);
 
-  const [leftView, setLeftView] = useState<'explorer' | 'editor'>('explorer');
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  
-  // Applet Viewer State for Center Panel
-  const [activeApplet, setActiveApplet] = useState<string | null>(null);
-
-  // Terminal UI State
-  const [terminalHistory, setTerminalHistory] = useState<{type: 'input' | 'output', text: string}[]>([]);
-  const [inputValue, setInputValue] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-  const terminalEndRef = useRef<HTMLDivElement>(null);
+  const {
+    closeTabsToRight,
+    closeOtherTabs,
+    setTabs
+  } = useAppStore();
 
   useEffect(() => {
-    // Keep terminal scrolled to bottom without scrolling outer containers
-    const parent = terminalEndRef.current?.parentElement;
-    if (parent) {
-      parent.scrollTop = parent.scrollHeight;
-    }
-  }, [terminalHistory]);
+    document.documentElement.style.setProperty('--mica-opacity', micaOpacity.toString());
+    document.documentElement.style.setProperty('--mica-blur', `${micaBlur}px`);
+  }, [micaOpacity, micaBlur]);
 
   useEffect(() => {
-    // Subscribe to async output from Android backend
-    const unsubscribe = subscribeToOutput((text) => {
-      setTerminalHistory(prev => [...prev, { type: 'output', text }]);
-    });
-    // React Handshake! Tell C# we are awake.
-    if (typeof window !== 'undefined' && window.AndroidBridge && window.AndroidBridge.notifyReady) {
-      window.AndroidBridge.notifyReady();
+    let timeout: ReturnType<typeof setTimeout>;
+    if (autoHideTabs && tabsVisible) {
+      timeout = setTimeout(() => setTabsVisible(false), 3000);
     }
-    return () => unsubscribe();
-  }, []);
-
-  const handleTerminalInput = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      const cmd = inputValue.trim();
-      if (!cmd) return;
-      
-      if (cmd.toLowerCase() === 'clear' || cmd.toLowerCase() === 'cls') {
-         setTerminalHistory([]);
-         setInputValue('');
-         return;
-      }
-      
-      setTerminalHistory(prev => [...prev, { type: 'input', text: cmd }]);
-      executeCommand(cmd);
-      setInputValue('');
-    }
-  };
+    return () => clearTimeout(timeout);
+  }, [autoHideTabs, tabsVisible]);
 
   useEffect(() => {
-    const handleMessage = (e: MessageEvent) => {
-      if (e.data === 'close-applet') {
-        setActiveApplet(null);
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.app-dropdown-menu') && !target.closest('.app-menu-trigger')) {
+        setHamburgerMenuOpen(false);
+        setNewTabMenuOpen(false);
+        setContextMenu(null);
       }
     };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
-
-  // File structure mock
-  const WORKSPACE = {
-    applets: [
-      { name: 'dev-explorer.html', path: '/applets/dev-explorer.html' },
-      { name: 'media-stitcher.html', path: '/applets/media-stitcher.html' },
-      { name: 'text.html', path: '/applets/text.html' }
-    ],
-    scripts: [
-      { name: 'txt.ps1', path: '/scripts/txt.ps1' }
-    ],
-    widgets: []
-  };
-
-  const openApplet = (path: string) => {
-    setActiveApplet(path);
-    setView('center');
-  };
-
-  const openScript = async (path: string) => {
-    try {
-      const res = await fetch(path);
-      const text = await res.text();
-      setEditorText(text);
-      setSelectedFile(path);
-      setLeftView('editor');
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const lines = editorText.split('\n').length;
-  const chars = editorText.length;
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [setHamburgerMenuOpen]);
 
   return (
-    <div className="fixed inset-0 w-full h-full bg-[#000] overflow-hidden touch-none select-none font-sans">
-      <div className="absolute inset-0 opacity-5 pointer-events-none" 
-           style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+    <div className="fixed inset-0 w-full h-full bg-[#000] overflow-hidden font-sans flex flex-col">
+      {/* Main Container */}
+      <div className="w-full h-full overflow-hidden relative shadow-md bg-[#09090b] select-none isolate flex flex-col">
+        
+        {/* Main Terminal Container */}
+        <div className="flex-1 w-full h-full overflow-hidden bg-[#012456] relative font-mono flex flex-col pointer-events-auto">
 
-      <motion.div
-        className="absolute inset-0 z-10"
-        initial={false}
-        animate={view}
-        variants={{
-          center: { x: '0%', y: '0%' },
-          left: { x: '100%', y: '0%' },
-          right: { x: '-100%', y: '0%' },
-          top: { x: '0%', y: '35%' },
-          bottom: { x: '0%', y: '-40%' }
-        }}
-        transition={{ type: 'tween', ease: 'circOut', duration: navMode === 'hamburger' ? 0 : 0.3 }}
-      >
-        {/* Top Panel - Workspace Nav */}
-        <div 
-          className="absolute w-full h-full bg-[#f3f3f3] flex flex-col justify-end pb-8 px-4"
-          style={{ top: '-100%', left: 0 }}
-        >
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-4">Terminal Profiles</h2>
-          <div className="flex gap-4 overflow-x-auto custom-scrollbar items-center pb-2">
-             <button className="flex flex-col items-center justify-center gap-2 w-24 h-24 shrink-0 bg-white hover:bg-gray-50 text-gray-800 rounded-xl font-medium transition-colors border border-gray-200 shadow-sm">
-              <Plus className="w-6 h-6 text-blue-600" />
-              <span className="text-[10px] uppercase font-semibold tracking-wider">New</span>
-            </button>
-            <button onClick={() => { setView('left'); setLeftView('explorer'); }} className="flex flex-col items-center justify-center gap-2 w-24 h-24 shrink-0 bg-white hover:bg-gray-50 text-gray-800 rounded-xl transition-colors border border-gray-200 shadow-sm group">
-               <TerminalSquare className="w-8 h-8 text-blue-600 opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all" />
-               <span className="text-[10px] uppercase font-semibold tracking-wider">Default</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Bottom Panel - Settings */}
-        <div 
-          className="absolute w-full h-full bg-[#f3f3f3] flex flex-col pt-8 px-4"
-          style={{ top: '100%', left: 0 }}
-        >
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-widest">System Settings</h2>
-          </div>
-          <div className="flex flex-col gap-4 overflow-y-auto custom-scrollbar pr-2 pb-2 text-sm text-gray-800 font-sans">
-             <div className="flex justify-between items-center bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
-                <span className="font-medium">Theme Preference</span>
-                <div className="flex gap-2">
-                   <button className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded">Auto</button>
-                   <button className="px-3 py-1 bg-white hover:bg-gray-50 text-gray-700 rounded border border-gray-200">Dark</button>
-                   <button className="px-3 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded font-medium">Light</button>
-                </div>
-             </div>
-             
-             <div className="flex justify-between items-center bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
-                <span className="font-medium">Terminal Font Size</span>
-                <div className="flex gap-2">
-                   <button className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded">12px</button>
-                   <button className="px-3 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded font-medium">14px</button>
-                   <button className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded">16px</button>
-                </div>
-             </div>
-
-             <div className="flex justify-between items-center bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
-                <span className="font-medium">Navigation Mode</span>
-                <div className="flex gap-2">
-                   <button 
-                     onClick={() => setNavMode('joystick')}
-                     className={`px-3 py-1 rounded border font-medium ${navMode === 'joystick' ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'}`}
-                   >
-                     Joystick
-                   </button>
-                   <button 
-                     onClick={() => setNavMode('hamburger')}
-                     className={`px-3 py-1 rounded border font-medium ${navMode === 'hamburger' ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'}`}
-                   >
-                     Hamburger
-                   </button>
-                </div>
-             </div>
-          </div>
-        </div>
-
-        {/* Left Panel - File Explorer and Editor */}
-        <div 
-          className="absolute w-full h-full bg-[#f3f3f3] flex flex-col pt-12 pb-6 px-4 overflow-hidden"
-          style={{ top: 0, left: '-100%' }}
-        >
-          <div className="flex justify-between items-center mb-4 shrink-0">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-widest">
-               {leftView === 'explorer' ? 'Workspace' : 'Editor'}
-            </h2>
-            <div className="flex gap-2">
-              {leftView === 'editor' && (
-                <button 
-                  onClick={() => setLeftView('explorer')}
-                  className="p-2 hover:bg-gray-200 text-gray-500 hover:text-gray-800 rounded-lg transition-colors text-xs font-bold uppercase"
-                >
-                  Back
-                </button>
-              )}
-              <button className="p-2 hover:bg-gray-200 text-gray-500 hover:text-gray-800 rounded-lg transition-colors">
-                <Settings2 className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          {leftView === 'explorer' ? (
-            <div className="flex-1 overflow-y-auto custom-scrollbar pb-8 flex flex-col gap-6">
-              <div className="flex flex-col gap-2">
-                 <h3 className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1 px-1">applets/</h3>
-                 {WORKSPACE.applets.map(file => (
-                   <div key={file.path} onClick={() => openApplet(file.path)} className="flex items-center gap-3 bg-white hover:bg-gray-50 border border-gray-200 shadow-sm rounded-lg p-3 cursor-pointer">
-                      <AppWindow className="w-4 h-4 text-blue-500" />
-                      <span className="text-xs font-medium text-gray-800">{file.name}</span>
-                   </div>
-                 ))}
-                 {WORKSPACE.applets.length === 0 && <div className="text-gray-400 text-xs px-2">Empty</div>}
-              </div>
-
-              <div className="flex flex-col gap-2">
-                 <h3 className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1 px-1">scripts/</h3>
-                 {WORKSPACE.scripts.map(file => (
-                   <div key={file.path} onClick={() => openScript(file.path)} className="flex items-center gap-3 bg-white hover:bg-gray-50 border border-gray-200 shadow-sm rounded-lg p-3 cursor-pointer">
-                      <TerminalSquare className="w-4 h-4 text-blue-500" />
-                      <span className="text-xs font-medium text-gray-800">{file.name}</span>
-                   </div>
-                 ))}
-                 {WORKSPACE.scripts.length === 0 && <div className="text-gray-400 text-xs px-2">Empty</div>}
-              </div>
-
-              <div className="flex flex-col gap-2">
-                 <h3 className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1 px-1">widgets/</h3>
-                 {WORKSPACE.widgets.map(file => (
-                   <div key={file.path} className="flex items-center gap-3 bg-white hover:bg-gray-50 border border-gray-200 shadow-sm rounded-lg p-3 cursor-pointer">
-                      <Cpu className="w-4 h-4 text-blue-500" />
-                      <span className="text-xs font-medium text-gray-800">{(file as any).name}</span>
-                   </div>
-                 ))}
-                 {WORKSPACE.widgets.length === 0 && <div className="text-gray-400 text-xs px-2">Empty</div>}
-              </div>
-            </div>
-          ) : (
-            <div className="flex-1 flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl overflow-hidden font-mono text-sm relative">
-              <div className="flex-1 flex h-full">
-                <div className="w-12 bg-gray-50 border-r border-gray-200 flex flex-col items-end py-3 pr-3 text-gray-400 select-none overflow-hidden text-[11px] leading-6 tracking-tight">
-                   {Array.from({length: Math.max(lines, 20)}).map((_, i) => <div key={i}>{i+1}</div>)}
-                </div>
-                <textarea 
-                  value={editorText}
-                  onChange={e => setEditorText(e.target.value)}
-                  className="flex-1 bg-transparent p-3 outline-none text-gray-800 resize-none custom-scrollbar leading-6 pointer-events-auto" 
-                  spellCheck={false}
-                  autoCapitalize="off"
-                  autoComplete="off"
-                />
-              </div>
-            </div>
-          )}
-          
-          {leftView === 'editor' && (
-            <div className="flex items-center justify-between mt-4 px-1 text-[10px] uppercase font-bold tracking-widest text-gray-500 shrink-0">
-              <div className="flex gap-4">
-                <span className="flex items-center gap-1.5"><FileCode2 className="w-3 h-3"/> {lines} Lines</span>
-                <span>{chars} Chars</span>
-              </div>
-              <span className="bg-gray-200 px-2 py-1 rounded">UTF-8</span>
-            </div>
+          {/* Trigger area to show tabs when auto-hidden */}
+          {autoHideTabs && (
+             <div 
+               className="absolute top-0 left-0 right-0 h-12 z-[400]"
+               onMouseEnter={() => setTabsVisible(true)}
+               onClick={() => setTabsVisible(true)}
+             />
           )}
 
-          {/* Mini Terminal PIP */}
-          <div 
-            onClick={() => setView('center')}
-            className="absolute bottom-6 right-6 w-24 h-16 bg-[#012456] rounded-lg shadow-xl shadow-black/20 border border-gray-300 flex flex-col overflow-hidden cursor-pointer hover:scale-105 active:scale-95 transition-transform z-50"
+          {/* Windows Terminal Top Bar (Tabs) */}
+          <motion.div 
+             initial={false}
+             animate={{
+                y: (!autoHideTabs || tabsVisible) ? 0 : -60,
+                opacity: (!autoHideTabs || tabsVisible) ? 1 : 0
+             }}
+             transition={{ duration: 0.2 }}
+             className={cn(
+               "absolute top-0 left-0 right-0 h-[56px] flex items-center shrink-0 select-none z-[400]",
+               !autoHideTabs && "bg-[#1C1C1C] border-b border-black"
+             )}
           >
-            <div className="h-4 bg-[#f3f3f3] flex items-center px-1 border-b border-gray-300">
-              <div className="text-[#0078d4] font-bold tracking-tighter" style={{ fontSize: '8px' }}>&gt;_</div>
-            </div>
-            <div className="flex-1 p-1">
-              <div className="text-white font-mono opacity-80" style={{ fontSize: '5px', lineHeight: '8px' }}>
-                PS &gt; _
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Panel - Applets Menu (Quick Launch) */}
-        <div 
-          className="absolute w-full h-full bg-[#f3f3f3] flex flex-col pt-12 pb-6 px-4 overflow-y-auto"
-          style={{ top: 0, left: '100%' }}
-        >
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-6">Scripts</h2>
-
-          <div className="flex flex-col gap-6">
-            <div>
-              <h3 className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-3 px-1">Powershell Scripts</h3>
-              <div className="flex flex-col gap-2">
-                {APPLETS.filter(a => a.type === 'ps1').map(applet => (
-                  <div key={applet.id} className="group flex items-center justify-between bg-white hover:bg-gray-50 border border-gray-200 shadow-sm rounded-xl p-3 cursor-pointer transition-all">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <div className="bg-[#012456]/10 p-2 rounded-lg shrink-0">
-                        <img src="/assets/ps1-icon.svg" alt="PS1 Icon" className="w-4 h-4 object-contain" />
-                      </div>
-                      <span className="text-gray-800 text-xs font-medium truncate" title={applet.name}>{applet.name}</span>
-                    </div>
-                    <button className="opacity-0 group-hover:opacity-100 p-2 rounded-lg bg-blue-600 text-white transition-all hover:scale-105 shadow-md shadow-blue-500/20">
-                      <Play className="w-3 h-3 fill-current" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-3 px-1">HTML Nodes</h3>
-              <div className="flex flex-col gap-2">
-                {APPLETS.filter(a => a.type === 'html').map(applet => (
-                  <div key={applet.id} className="group flex items-center justify-between bg-white hover:bg-gray-50 border border-gray-200 shadow-sm rounded-xl p-3 cursor-pointer transition-all">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <div className="bg-blue-50 p-2 rounded-lg shrink-0">
-                        <Code2 className="w-4 h-4 text-blue-600"/>
-                      </div>
-                      <span className="text-gray-800 text-xs font-medium truncate" title={applet.name}>{applet.name}</span>
-                    </div>
-                    <button className="opacity-0 group-hover:opacity-100 p-2 rounded-lg bg-blue-600 text-white transition-all hover:scale-105 shadow-md shadow-blue-500/20">
-                      <Play className="w-3 h-3 fill-current" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-          
-          {/* Mini Terminal PIP */}
-          <div 
-            onClick={() => setView('center')}
-            className="absolute bottom-6 left-6 w-24 h-16 bg-[#012456] rounded-lg shadow-xl shadow-black/20 border border-gray-300 flex flex-col overflow-hidden cursor-pointer hover:scale-105 active:scale-95 transition-transform z-50"
-          >
-            <div className="h-4 bg-[#f3f3f3] flex items-center px-1 border-b border-gray-300">
-              <div className="text-[#0078d4] font-bold tracking-tighter" style={{ fontSize: '8px' }}>&gt;_</div>
-            </div>
-            <div className="flex-1 p-1">
-              <div className="text-white font-mono opacity-80" style={{ fontSize: '5px', lineHeight: '8px' }}>
-                PS &gt; _
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Center Terminal Container */}
-        <div className="absolute w-full h-full pointer-events-auto" style={{ top: 0, left: 0 }}>
-          {/* Terminal Header & Frame (Only show for native terminal, not applets) */}
-          {!activeApplet && <div className="absolute inset-0 pointer-events-none z-30" />}
-          <div className="w-full h-full overflow-hidden bg-[#012456] relative font-mono flex flex-col">
-
-            {/* Windows Terminal Top Bar */}
-            {!activeApplet && (
-              <div className="h-10 bg-[#f3f3f3] flex items-center shrink-0 transition-opacity select-none border-b border-gray-300">
-                {/* Tab */}
-                <div className="flex items-center gap-2 h-full px-4 min-w-[120px] md:min-w-[200px] bg-white border-t-2 border-t-[#0078d4] text-gray-800 text-xs font-sans shadow-sm z-10">
-                  <div className="text-[#0078d4] font-bold text-sm w-4 flex justify-center">
-                    &gt;_
-                  </div>
-                  <div>pwsh</div>
-                </div>
-                {/* New Tab Button */}
-                <div className="flex h-full text-gray-600">
-                   <div className="px-3 hover:bg-gray-200 cursor-pointer flex items-center justify-center transition-colors border-r border-[#00000018]">
-                      <Plus size={14} />
-                   </div>
-                </div>
-                <div className="flex-1 bg-[#f3f3f3] h-full"></div>
-                {/* Windows Controls (Cosmetic + Minimize) */}
-                <div className="flex h-full text-gray-600">
-                   <div 
-                     className="px-4 hover:bg-gray-200 cursor-pointer flex items-center justify-center transition-colors"
-                     onClick={minimizeAppFromBridge}
-                   >
-                      <Minus size={14} />
-                   </div>
-                   <div className="px-4 hover:bg-gray-200 cursor-pointer flex items-center justify-center transition-colors">
-                      <Square size={12} />
-                   </div>
-                   <div className="px-4 hover:bg-[#c42b1c] hover:text-white cursor-pointer flex items-center justify-center transition-colors">
-                      <X size={14} />
-                   </div>
-                </div>
-              </div>
-            )}
-
-            {/* Body */}
-            {activeApplet ? (
-              <iframe src={activeApplet} className="flex-1 w-full h-full border-none bg-white" />
-            ) : (
-              <div className={cn(
-                "flex-1 p-4 overflow-y-auto text-sm leading-relaxed",
-                "text-[#eeedf0]" // PowerShell standard text
-              )}>
-                <div className="mb-4 whitespace-pre-wrap shrink-0">
-                  {`PowerShell 7.6.1
-Copyright (c) Microsoft Corporation.
-
-https://aka.ms/powershell
-Type 'help' to get help.
-`}
-                </div>
-
-                <div className="flex flex-col gap-1 w-full shrink-0">
-                  {terminalHistory.map((line, idx) => (
-                     <div key={idx} className={cn("whitespace-pre-wrap break-all", line.type === 'input' ? 'text-blue-300' : 'text-[#eeedf0]')}>
-                       {line.type === 'input' ? `PS ~> ${line.text}` : line.text}
-                     </div>
-                  ))}
-                </div>
-                
-                <div className="flex items-center mt-2 group shrink-0">
-                  <span className="shrink-0">PS &gt; </span>
-                  <input 
-                    ref={inputRef}
-                    type="text" 
-                    value={inputValue}
-                    onChange={e => setInputValue(e.target.value)}
-                    onKeyDown={handleTerminalInput}
-                    className="flex-1 bg-transparent border-none outline-none text-[#eeedf0] ml-2 font-mono w-full"
-                    autoFocus
-                    spellCheck={false}
-                  />
-                </div>
-                {/* Invisible element to auto-scroll */}
-                <div ref={terminalEndRef} className="h-4 shrink-0" />
-                
-              </div>
+            {autoHideTabs && (
+              <div className="absolute inset-0 mica-panel border-b border-white/10 shadow-xl pointer-events-none -z-10" />
             )}
             
+            {/* Hamburger Menu (Applets/Settings) */}
+            <div className="relative h-full flex items-center shrink-0">
+               <button 
+                 onClick={() => { setHamburgerMenuOpen(!hamburgerMenuOpen); setNewTabMenuOpen(false); }}
+                 className={cn(
+                   "app-menu-trigger h-full px-4 flex items-center justify-center", 
+                   hamburgerMenuOpen && (autoHideTabs ? "bg-white/10" : "bg-black/10"),
+                   !hamburgerMenuOpen && (autoHideTabs ? "active:bg-[rgba(255,255,255,0.15)] active:scale-[0.98] transition-all duration-300 ease-out active:duration-0" : "active:bg-white/10 active:scale-[0.98] transition-all duration-300 ease-out active:duration-0"),
+                   !autoHideTabs && "border-r border-[#00000050]"
+                 )}
+               >
+                  <Menu size={22} className={autoHideTabs ? "text-gray-200" : "text-gray-300"} />
+               </button>
+
+               <AnimatePresence>
+                 {hamburgerMenuOpen && (
+                   <>
+                     <HamburgerMenuContent />
+                   </>
+                 )}
+               </AnimatePresence>
+            </div>
+
+            <Reorder.Group 
+              axis="x" 
+              values={tabs} 
+              onReorder={setTabs} 
+              className="flex h-full overflow-x-auto hide-scrollbar scroll-smooth snap-x touch-pan-x shrink"
+            >
+              {/* Tabs */}
+              {tabs.map(tab => (
+                <Reorder.Item 
+                  key={tab.id}
+                  value={tab}
+                  onClick={() => setActiveTab(tab.id)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setContextMenu({ id: tab.id, x: e.clientX, y: e.clientY });
+                  }}
+                  dragListener={true}
+                  className={cn(
+                    "flex items-center gap-3 h-full px-3 md:px-4 min-w-[56px] md:min-w-[140px] max-w-[120px] md:max-w-[200px] text-sm font-sans shadow-sm cursor-pointer flex-shrink-0 group snap-start select-none",
+                    activeTabId === tab.id 
+                      ? (autoHideTabs ? "bg-white/10 text-white border-b-2 border-b-blue-500" : "bg-[#2D2D2D] text-[#eeedf0] border-t-[3px] border-t-[#0078d4]") 
+                      : (autoHideTabs ? "active:bg-[rgba(255,255,255,0.1)] active:scale-[0.98] transition-all duration-300 ease-out active:duration-0 text-gray-300" : "bg-[#1C1C1C] hover:bg-[#2A2A2A] active:bg-[#333] active:scale-[0.98] transition-all duration-300 ease-out active:duration-0 text-[#999] border-r border-[#00000050]")
+                  )}
+                >
+                  <div className={cn("w-5 flex justify-center items-center shrink-0 pointer-events-none", activeTabId === tab.id ? "text-[#eeedf0]" : (autoHideTabs ? "text-gray-400" : "text-[#666]"))}>
+                    {tab.type === 'terminal' && <span className="font-bold text-pink-500">&gt;_</span>}
+                    {tab.type === 'notepad' && <FileText size={16} className={autoHideTabs ? "text-blue-400" : "text-[#0078D7]"} />}
+                    {tab.type === 'explorer' && <FolderTree size={16} className={autoHideTabs ? "text-yellow-400" : "text-[#FCE166]"} />}
+                    {tab.type === 'colors' && <Settings2 size={16} className={autoHideTabs ? "text-red-400" : "text-[#A31515]"} />}
+                    {tab.type === 'settings' && <Settings2 size={16} className={autoHideTabs ? "text-gray-400" : "text-gray-600"} />}
+                    {tab.type === 'applet' && <LayoutTemplate size={16} className="text-[#ff3366]" />}
+                  </div>
+                  
+                  <div className="font-semibold truncate flex-1 text-[13px] hidden md:block pointer-events-none">{tab.title}</div>
+                </Reorder.Item>
+              ))}
+            </Reorder.Group>
+
+            {/* Add Tab Button inline with tabs */}
+            <div className="relative h-full flex items-center shrink-0 border-l border-white/5">
+              <button 
+                ref={plusButtonRef}
+                onClick={(e) => { 
+                  // Calculate available space to the right
+                  if (plusButtonRef.current) {
+                     const rect = plusButtonRef.current.getBoundingClientRect();
+                     // 224px is w-56
+                     if (window.innerWidth - rect.right < 224 && rect.left > 224) {
+                       setPlusMenuAnchor('right');
+                     } else {
+                       setPlusMenuAnchor('left');
+                     }
+                  }
+                  setNewTabMenuOpen(!newTabMenuOpen); 
+                  setHamburgerMenuOpen(false); 
+                }}
+                className={cn(
+                  "app-menu-trigger h-full px-4 flex items-center justify-center flex-shrink-0", 
+                  autoHideTabs ? "active:bg-[rgba(255,255,255,0.15)] active:scale-[0.98] transition-all duration-300 ease-out active:duration-0 text-gray-300" : "active:bg-white/10 active:scale-[0.98] transition-all duration-300 ease-out active:duration-0 bg-[#1C1C1C] text-gray-400"
+                )}
+              >
+                <Plus size={20} />
+              </button>
+              <AnimatePresence>
+                {newTabMenuOpen && (
+                  <>
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: -5 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: -5 }}
+                      transition={{ duration: 0.15 }}
+                      className={cn(
+                        "app-dropdown-menu absolute w-56 mica-panel mica-border shadow-2xl py-2 z-50 text-sm font-sans text-shadow-mica",
+                        plusMenuAnchor === 'right' ? 'right-0' : 'left-0',
+                        autoHideTabs ? "top-full mt-2 rounded-xl" : "top-[56px] rounded-b-xl"
+                      )}
+                    >
+                      <button onClick={() => { addTab({ id: 'pwsh-'+Date.now(), type: 'terminal', title: 'pwsh' }); setNewTabMenuOpen(false); }} className="w-full px-5 py-3 active:bg-[rgba(255,255,255,0.15)] active:scale-[0.98] transition-all duration-300 ease-out active:duration-0 flex items-center gap-3 text-shadow-mica text-left font-medium">
+                        <span className="font-bold text-pink-500 w-5 text-center">&gt;_</span> Terminal
+                      </button>
+                      <button onClick={() => { addTab({ id: 'notepad-'+Date.now(), type: 'notepad', title: 'untitled.txt', content: '' }); setNewTabMenuOpen(false); }} className="w-full px-5 py-3 active:bg-[rgba(255,255,255,0.15)] active:scale-[0.98] transition-all duration-300 ease-out active:duration-0 flex items-center gap-3 text-shadow-mica text-left font-medium">
+                        <FileText size={18} className="text-blue-400" /> Editor
+                      </button>
+                      <button onClick={() => { addTab({ id: 'explorer-'+Date.now(), type: 'explorer', title: 'Files' }); setNewTabMenuOpen(false); }} className="w-full px-5 py-3 active:bg-[rgba(255,255,255,0.15)] active:scale-[0.98] transition-all duration-300 ease-out active:duration-0 flex items-center gap-3 text-shadow-mica text-left font-medium">
+                        <FolderTree size={18} className="text-yellow-400" /> Files
+                      </button>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Spacer */}
+            <div className="flex-1" />
+
+            {/* Close Button placed within the animated top bar */}
+            <div className="h-full flex items-center shrink-0 border-l border-white/5">
+               <button 
+                 onClick={() => {
+                   if (activeTabId) removeTab(activeTabId);
+                 }}
+                 className={cn(
+                   "h-full px-5 flex items-center justify-center", 
+                   autoHideTabs ? "active:bg-red-500/20" : "active:bg-[#c42b1c] active:text-white "
+                 )}
+               >
+                  <X size={20} className={cn(autoHideTabs ? "text-gray-400" : "text-gray-500", "active:text-red-400")} />
+               </button>
+            </div>
+          </motion.div>
+
+        {/* Main Terminal Container */}
+          <div className={cn(
+             "absolute w-full bottom-0 transition-all",
+             !autoHideTabs ? "top-[56px]" : "top-0"
+          )}>
+            {tabs.length === 0 && (
+               <div className="absolute inset-0 flex items-center justify-center text-[#eeedf0]/50 font-sans text-sm bg-[#012456]">
+                 Tap 'hamburger menu' or + to start.
+               </div>
+            )}
+            
+            {tabs.map(tab => {
+              const isActive = activeTabId === tab.id;
+              return (
+                <div key={tab.id} className={cn("absolute inset-0 w-full h-full shadow-[inset_0_4px_10px_rgba(0,0,0,0.3)] overflow-hidden", isActive ? "block" : "hidden pointer-events-none", tab.type === 'terminal' ? "bg-[#012456]" : "bg-[#191919]")}>
+                  {tab.type === 'terminal' && <TerminalEmulator tab={tab} />}
+                  {tab.type === 'notepad' && <NativeNotepad tab={tab} />}
+                  {tab.type === 'explorer' && <NativeExplorer tab={tab} />}
+                  {tab.type === 'settings' && <SettingsTab />}
+                  {(tab.type === 'colors' || tab.type === 'applet') && (
+                    <iframe 
+                      src={tab.path}
+                      className="w-full h-full border-none bg-black isolate"
+                      sandbox="allow-scripts allow-forms allow-same-origin allow-downloads allow-popups allow-modals"
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
+          
         </div>
 
-      </motion.div>
+        {/* Floating UI Elements */}
+        {thumbstickVisible && <Thumbstick />}
+        <FloatingCommandPalette />
+        <Notifications />
 
-      {navMode === 'joystick' && <Thumbstick view={view} setView={setView} />}
-      
-      {navMode === 'hamburger' && (
-        <HamburgerStick view={view} setView={setView} isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />
-      )}
-      
+      </div>
+
+      <AnimatePresence>
+        {contextMenu && (
+          <>
+            <div className="fixed inset-0 z-[200]" onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }} onClick={() => setContextMenu(null)} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.1 }}
+              style={{ top: Math.min(contextMenu.y, window.innerHeight - 150), left: Math.min(contextMenu.x, window.innerWidth - 200) }}
+              className="fixed w-48 mica-panel mica-border shadow-2xl py-1 z-[210] rounded-xl text-sm font-sans text-shadow-mica overflow-hidden"
+            >
+              <button 
+                onClick={() => { removeTab(contextMenu.id); setContextMenu(null); }} 
+                className="w-full px-4 py-2 active:bg-[rgba(255,255,255,0.15)] active:scale-[0.98] transition-all duration-300 ease-out active:duration-0 text-left font-medium flex items-center justify-between"
+              >
+                Close Tab
+              </button>
+              <button 
+                onClick={() => { closeOtherTabs(contextMenu.id); setContextMenu(null); }} 
+                className="w-full px-4 py-2 active:bg-[rgba(255,255,255,0.15)] active:scale-[0.98] transition-all duration-300 ease-out active:duration-0 text-left font-medium flex items-center justify-between"
+              >
+                Close Other Tabs
+              </button>
+              <button 
+                onClick={() => { closeTabsToRight(contextMenu.id); setContextMenu(null); }} 
+                className="w-full px-4 py-2 active:bg-[rgba(255,255,255,0.15)] active:scale-[0.98] transition-all duration-300 ease-out active:duration-0 text-left font-medium flex items-center justify-between"
+              >
+                Close Tabs to Right
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
-
-
-
-

@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Notepad</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --font-ui: "Segoe UI", "Open Sans", Roboto, "Helvetica Neue", sans-serif;
+    --font-mono: "Consolas", "Courier New", monospace;
+  }
+  body { font-family: var(--font-ui); overflow: hidden; height: 100vh; display: flex; flex-direction: column; user-select: none; }
+  body.dark { background: #1E1E1E; color: #fff; }
+  body.dark .tabs-bar { background: #111; }
+  body.dark .tab { background: #252526; color: #9d9d9d; }
+  body.dark .tab:hover { background: #2D2D2D; }
+  body.dark .tab.active { background: #1E1E1E; color: #fff; }
+  body.dark .tab.active .tab-accent { background: rgba(255,255,255,.18); }
+  body.dark .tab-close:hover { background: rgba(255,255,255,.12); }
+  body.dark .new-tab-btn { color: #9d9d9d; }
+  body.dark .new-tab-btn:hover { background: #2D2D2D; }
+  body.dark .menu-bar { background: #1A1A1A; border-bottom: 1px solid #2D2D2D; }
+  body.dark .menu-btn { color: #ccc; }
+  body.dark .menu-btn:hover, body.dark .menu-btn.open { background: rgba(255,255,255,.1); }
+  body.dark .dropdown { background: rgba(28,28,28,.88); border-color: rgba(255,255,255,.1); color: #d4d4d4; }
+  body.dark .menu-item:hover { background: rgba(255,255,255,.1); color: #fff; }
+  body.dark .menu-sep { background: rgba(255,255,255,.1); }
+  body.dark .menu-section-label { color: #888; }
+  body.dark .status-bar { background: #1A1A1A; border-top: 1px solid #2D2D2D; color: #858585; }
+  body.dark #editor-host { background: #1E1E1E; }
+
+  body.light { background: #fff; color: #333; }
+  body.light .tabs-bar { background: #ECECEC; }
+  body.light .tab { background: #E5E5E5; color: #666; }
+  body.light .tab:hover { background: #D4D4D4; }
+  body.light .tab.active { background: #fff; color: #333; }
+  body.light .tab.active .tab-accent { background: #007ACC; }
+  body.light .tab-close:hover { background: rgba(0,0,0,.1); }
+  body.light .new-tab-btn { color: #666; }
+  body.light .new-tab-btn:hover { background: #D4D4D4; }
+  body.light .menu-bar { background: #F3F3F3; border-bottom: 1px solid #E0E0E0; }
+  body.light .menu-btn { color: #333; }
+  body.light .menu-btn:hover, body.light .menu-btn.open { background: rgba(0,0,0,.1); }
+  body.light .dropdown { background: rgba(252,252,252,.92); border-color: rgba(0,0,0,.1); color: #333; }
+  body.light .menu-item:hover { background: rgba(0,0,0,.08); color: #000; }
+  body.light .menu-sep { background: rgba(0,0,0,.1); }
+  body.light .menu-section-label { color: #888; }
+  body.light .status-bar { background: #F3F3F3; border-top: 1px solid #E0E0E0; color: #666; }
+  body.light #editor-host { background: #fff; }
+
+  .tabs-bar { height: 36px; display: flex; align-items: flex-end; padding-left: 4px; flex-shrink: 0; position: relative; z-index: 20; overflow-x: auto; overflow-y: hidden; }
+  .tabs-bar::-webkit-scrollbar { height: 0; }
+  .tab { display: flex; align-items: center; position: relative; height: 34px; padding: 0 10px; min-width: 120px; max-width: 200px; cursor: pointer; border-radius: 6px 6px 0 0; margin: 0 1px; font-size: 12px; transition: background .12s, color .12s; flex-shrink: 0; }
+  .tab-accent { position: absolute; top: 0; left: 0; right: 0; height: 2px; border-radius: 6px 6px 0 0; }
+  .tab-icon { width: 14px; height: 14px; margin-right: 7px; flex-shrink: 0; }
+  .tab-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tab-close { width: 18px; height: 18px; border-radius: 3px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: inherit; margin-left: 4px; flex-shrink: 0; opacity: 0; transition: opacity .1s, background .1s; }
+  .tab:hover .tab-close, .tab.active .tab-close { opacity: 1; }
+  .new-tab-btn { height: 28px; width: 30px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; cursor: pointer; border-radius: 4px; margin-bottom: 3px; margin-left: 2px; transition: background .12s; flex-shrink: 0; }
+
+  .menu-bar { height: 28px; display: flex; align-items: center; padding: 0 6px; font-size: 13px; flex-shrink: 0; position: relative; z-index: 30; box-shadow: 0 1px 6px rgba(0,0,0,.2); }
+  .menu-wrapper { position: relative; }
+  .menu-btn { padding: 3px 10px; border: none; background: transparent; cursor: pointer; font-family: var(--font-ui); font-size: 13px; border-radius: 4px; transition: background .1s; outline: none; color: inherit; }
+  .menu-btn .underline-char { text-decoration: underline; text-underline-offset: 2px; text-decoration-color: rgba(128,128,128,.5); }
+
+  .dropdown { position: absolute; top: calc(100% + 4px); left: 0; min-width: 200px; padding: 6px 0; border-radius: 6px; border: 1px solid; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 8px 32px rgba(0,0,0,.5); display: none; font-size: 13px; z-index: 50; }
+  .dropdown.open { display: block; }
+  .menu-item { display: flex; align-items: center; justify-content: space-between; padding: 5px 14px; cursor: pointer; transition: background .08s; position: relative; white-space: nowrap; }
+  .menu-item .check { width: 14px; margin-right: 4px; font-size: 11px; }
+  .menu-item .shortcut { font-size: 11px; color: #888; margin-left: 28px; }
+  .menu-sep { height: 1px; margin: 5px 0; }
+  .menu-section-label { padding: 3px 14px; font-size: 11px; font-weight: 600; }
+
+  #editor-host { flex: 1; position: relative; contain: strict; display: flex; flex-direction: column; overflow: hidden; }
+  #monaco-container { width: 100%; height: 100%; }
+
+  .monaco-editor .minimap { background: rgba(30,30,30,.1) !important; backdrop-filter: blur(20px) !important; box-shadow: -4px 0 24px rgba(0,0,0,.2) !important; }
+  .vs .monaco-editor .minimap { background: rgba(255,255,255,.4) !important; box-shadow: -4px 0 24px rgba(0,0,0,.05) !important; }
+  .monaco-editor .minimap-shadow-visible { display: none !important; }
+
+  .status-bar { height: 24px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; font-size: 11px; flex-shrink: 0; cursor: default; z-index: 20; }
+  .status-left, .status-right { display: flex; align-items: center; gap: 18px; }
+</style>
+</head>
+<body class="dark">
+
+<div class="tabs-bar" id="tabs-bar">
+  <button class="new-tab-btn" id="new-tab-btn" title="New File">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  </button>
+</div>
+
+<div class="menu-bar" id="menu-bar">
+  <div class="menu-wrapper">
+    <button class="menu-btn" data-menu="file"><span class="underline-char">F</span>ile</button>
+    <div class="dropdown" id="menu-file">
+      <div class="menu-item" data-action="new-tab">  <span class="check"></span>New File   <span class="shortcut">Ctrl+N</span></div>
+      <div class="menu-item" data-action="open">     <span class="check"></span>Open File… <span class="shortcut">Ctrl+O</span></div>
+      <div class="menu-sep"></div>
+      <div class="menu-item" data-action="save">     <span class="check"></span>Save       <span class="shortcut">Ctrl+S</span></div>
+      <div class="menu-item" data-action="save-as">  <span class="check"></span>Save As…</div>
+      <div class="menu-sep"></div>
+      <div class="menu-item" data-action="close-tab"><span class="check"></span>Close File <span class="shortcut">Ctrl+W</span></div>
+    </div>
+  </div>
+  <div class="menu-wrapper">
+    <button class="menu-btn" data-menu="edit"><span class="underline-char">E</span>dit</button>
+    <div class="dropdown" id="menu-edit">
+      <div class="menu-item" data-action="undo">   <span class="check"></span>Undo    <span class="shortcut">Ctrl+Z</span></div>
+      <div class="menu-item" data-action="redo">   <span class="check"></span>Redo    <span class="shortcut">Ctrl+Y</span></div>
+      <div class="menu-sep"></div>
+      <div class="menu-item" data-action="find">   <span class="check"></span>Find    <span class="shortcut">Ctrl+F</span></div>
+      <div class="menu-item" data-action="replace"><span class="check"></span>Replace <span class="shortcut">Ctrl+H</span></div>
+    </div>
+  </div>
+  <div class="menu-wrapper">
+    <button class="menu-btn" data-menu="view"><span class="underline-char">V</span>iew</button>
+    <div class="dropdown" id="menu-view">
+      <div class="menu-item" data-action="toggle-minimap">    <span class="check" id="chk-minimap"></span>Minimap</div>
+      <div class="menu-item" data-action="toggle-wordwrap">   <span class="check" id="chk-wordwrap"></span>Word Wrap</div>
+      <div class="menu-item" data-action="toggle-linenumbers"><span class="check" id="chk-linenumbers">✓</span>Line Numbers</div>
+    </div>
+  </div>
+  <div class="menu-wrapper">
+    <button class="menu-btn" data-menu="settings"><span class="underline-char">S</span>ettings</button>
+    <div class="dropdown" id="menu-settings">
+      <div class="menu-section-label">Theme</div>
+      <div class="menu-item" data-action="theme-dark"> <span class="check" id="chk-theme-dark">✓</span>Dark</div>
+      <div class="menu-item" data-action="theme-light"><span class="check" id="chk-theme-light"></span>Light</div>
+      <div class="menu-item" data-action="theme-auto"> <span class="check" id="chk-theme-auto"></span>Auto</div>
+    </div>
+  </div>
+</div>
+
+<div id="editor-host" onclick="closeAllMenus()">
+  <div id="monaco-container"></div>
+</div>
+
+<div class="status-bar">
+  <div class="status-left"><span id="status-cursor">Ln 1, Col 1</span></div>
+  <div class="status-right"><span>CRLF</span><span>UTF-8</span><span>Spaces: 4</span><span id="status-lang">Plain Text</span></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.0/min/vs/loader.min.js"></script>
+<script>
+'use strict';
+let tabs = [];
+let activeTabId = null;
+let editor = null;
+let activeMenu = null;
+let showMinimap = false;
+let showLineNumbers = true;
+let wordWrap = false;
+let themePref = 'dark';
+let isDark = true;
+let tabCounter = 0;
+
+const LANGUAGES = [
+  { id: 'plaintext', label: 'Plain Text', ext: ['txt'] },
+  { id: 'javascript', label: 'JavaScript', ext: ['js', 'jsx', 'mjs', 'cjs'] },
+  { id: 'typescript', label: 'TypeScript', ext: ['ts', 'tsx'] },
+  { id: 'html', label: 'HTML', ext: ['html', 'htm'] },
+  { id: 'css', label: 'CSS', ext: ['css'] },
+  { id: 'json', label: 'JSON', ext: ['json'] },
+  { id: 'powershell', label: 'PowerShell', ext: ['ps1', 'psm1', 'psd1'] }
+];
+
+function langFromFilename(name) {
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  return LANGUAGES.find(l => l.ext.includes(ext)) || LANGUAGES[0];
+}
+
+function langLabel(id) {
+  return (LANGUAGES.find(l => l.id === id) || LANGUAGES[0]).label;
+}
+
+function fileIconSVG(cls = '') {
+  return `<svg class="tab-icon \${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter"><path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v18z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+}
+
+const mq = window.matchMedia('(prefers-color-scheme: dark)');
+function applyTheme() {
+  isDark = themePref === 'auto' ? mq.matches : themePref === 'dark';
+  document.body.classList.toggle('dark', isDark);
+  document.body.classList.toggle('light', !isDark);
+  if (editor) {
+    editor.updateOptions({ theme: isDark ? 'bionic-dark' : 'ps-light' });
+    monaco.editor.setTheme(isDark ? 'bionic-dark' : 'ps-light');
+  }
+  document.getElementById('chk-theme-dark').textContent = themePref === 'dark' ? '✓' : '';
+  document.getElementById('chk-theme-light').textContent = themePref === 'light' ? '✓' : '';
+  document.getElementById('chk-theme-auto').textContent = themePref === 'auto' ? '✓' : '';
+}
+mq.addEventListener('change', () => { if (themePref === 'auto') applyTheme(); });
+
+function createTab(title = null, content = '', fileHandle = null) {
+  tabCounter++;
+  const id = \`tab-\${tabCounter}\`;
+  title = title || \`untitled-\${tabCounter}.txt\`;
+  const lang = langFromFilename(title);
+  tabs.push({ id, title, content, language: lang.id, fileHandle });
+  return id;
+}
+
+function getActiveTab() { return tabs.find(t => t.id === activeTabId); }
+
+function switchTab(id) {
+  const prev = getActiveTab();
+  if (prev && editor) prev.content = editor.getValue();
+  activeTabId = id;
+  renderTabs();
+  const tab = getActiveTab();
+  if (!tab || !editor) return;
+  const uri = monaco.Uri.parse(\`file:///\${tab.id}\`);
+  let model = monaco.editor.getModel(uri);
+  if (!model) model = monaco.editor.createModel(tab.content, tab.language, uri);
+  editor.setModel(model);
+  document.getElementById('status-lang').textContent = langLabel(tab.language);
+}
+
+function addNewTab() {
+  switchTab(createTab());
+  closeAllMenus();
+}
+
+function closeTab(id, e) {
+  if (e) e.stopPropagation();
+  closeAllMenus();
+  const uri = monaco.Uri.parse(\`file:///\${id}\`);
+  const model = monaco.editor.getModel(uri);
+  if (model) model.dispose();
+  const idx = tabs.findIndex(t => t.id === id);
+  tabs = tabs.filter(t => t.id !== id);
+  if (tabs.length === 0) { addNewTab(); return; }
+  if (id === activeTabId) switchTab(tabs[Math.min(idx, tabs.length - 1)].id);
+  else renderTabs();
+}
+
+function renderTabs() {
+  const bar = document.getElementById('tabs-bar');
+  [...bar.querySelectorAll('.tab')].forEach(el => el.remove());
+  const newBtn = document.getElementById('new-tab-btn');
+  tabs.forEach(tab => {
+    const div = document.createElement('div');
+    div.className = 'tab' + (tab.id === activeTabId ? ' active' : '');
+    div.dataset.tabId = tab.id;
+    div.innerHTML = \`<div class="tab-accent"></div>\${fileIconSVG()}<span class="tab-title" title="\${escHtml(tab.title)}">\${escHtml(tab.title)}</span><button class="tab-close" title="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>\`;
+    div.addEventListener('click', () => switchTab(tab.id));
+    div.querySelector('.tab-close').addEventListener('click', (e) => closeTab(tab.id, e));
+    bar.insertBefore(div, newBtn);
+  });
+}
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function closeAllMenus() {
+  document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('open'));
+  document.querySelectorAll('.menu-btn').forEach(b => b.classList.remove('open'));
+  activeMenu = null;
+}
+
+function toggleMenu(name) {
+  const isOpen = activeMenu === name;
+  closeAllMenus();
+  if (!isOpen) {
+    document.getElementById(\`menu-\${name}\`).classList.add('open');
+    document.querySelector(\`[data-menu="\${name}"]\`).classList.add('open');
+    activeMenu = name;
+  }
+}
+
+document.getElementById('menu-bar').addEventListener('click', e => {
+  const btn = e.target.closest('[data-menu]');
+  if (btn) { toggleMenu(btn.dataset.menu); return; }
+  const item = e.target.closest('[data-action]');
+  if (item) handleAction(item.dataset.action);
+});
+
+document.addEventListener('mousedown', e => {
+  if (!e.target.closest('.menu-wrapper') && !e.target.closest('#editor-host')) closeAllMenus();
+});
+
+function handleAction(action) {
+  closeAllMenus();
+  switch (action) {
+    case 'new-tab': addNewTab(); break;
+    case 'open': openFile(); break;
+    case 'save': saveFile(false); break;
+    case 'save-as': saveFile(true); break;
+    case 'close-tab': closeTab(activeTabId); break;
+    case 'undo': editor?.trigger('keyboard', 'undo', null); break;
+    case 'redo': editor?.trigger('keyboard', 'redo', null); break;
+    case 'find': editor?.trigger('keyboard', 'actions.find', null); break;
+    case 'replace': editor?.trigger('keyboard', 'editor.action.startFindReplaceAction', null); break;
+    case 'toggle-minimap':
+      showMinimap = !showMinimap;
+      editor?.updateOptions({ minimap: { enabled: showMinimap } });
+      document.getElementById('chk-minimap').textContent = showMinimap ? '✓' : '';
+      break;
+    case 'toggle-wordwrap':
+      wordWrap = !wordWrap;
+      editor?.updateOptions({ wordWrap: wordWrap ? 'on' : 'off' });
+      document.getElementById('chk-wordwrap').textContent = wordWrap ? '✓' : '';
+      break;
+    case 'toggle-linenumbers':
+      showLineNumbers = !showLineNumbers;
+      editor?.updateOptions({ lineNumbers: showLineNumbers ? 'on' : 'off' });
+      document.getElementById('chk-linenumbers').textContent = showLineNumbers ? '✓' : '';
+      break;
+    case 'theme-dark': themePref = 'dark'; applyTheme(); break;
+    case 'theme-light': themePref = 'light'; applyTheme(); break;
+    case 'theme-auto': themePref = 'auto'; applyTheme(); break;
+  }
+}
+
+async function openFile() {
+  if (!window.showOpenFilePicker) return alert('File System Access API unsupported.');
+  try {
+    const [handle] = await window.showOpenFilePicker({ multiple: false });
+    const file = await handle.getFile();
+    const content = await file.text();
+    const prev = getActiveTab();
+    if (prev && editor) prev.content = editor.getValue();
+    const lang = langFromFilename(file.name);
+    const id = \`tab-\${++tabCounter}\`;
+    tabs.push({ id, title: file.name, content, language: lang.id, fileHandle: handle });
+    switchTab(id);
+  } catch (e) { if (e.name !== 'AbortError') console.error('Open failed:', e); }
+}
+
+async function saveFile(saveAs = false) {
+  const tab = getActiveTab();
+  if (!tab) return;
+  if (editor) tab.content = editor.getValue();
+  if (!window.showSaveFilePicker) return alert('File System Access API unsupported.');
+  try {
+    let handle = tab.fileHandle;
+    if (!handle || saveAs) handle = await window.showSaveFilePicker({ suggestedName: tab.title });
+    const writable = await handle.createWritable();
+    await writable.write(tab.content);
+    await writable.close();
+    const file = await handle.getFile();
+    const lang = langFromFilename(file.name);
+    tab.fileHandle = handle; tab.title = file.name; tab.language = lang.id;
+    const uri = monaco.Uri.parse(\`file:///\${tab.id}\`);
+    const model = monaco.editor.getModel(uri);
+    if (model) monaco.editor.setModelLanguage(model, lang.id);
+    document.getElementById('status-lang').textContent = lang.label;
+    renderTabs();
+  } catch (e) { if (e.name !== 'AbortError') console.error('Save failed:', e); }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey) {
+    switch (e.key.toLowerCase()) {
+      case 'n': e.preventDefault(); addNewTab(); break;
+      case 'o': e.preventDefault(); openFile(); break;
+      case 's': e.preventDefault(); saveFile(e.shiftKey); break;
+      case 'w': e.preventDefault(); closeTab(activeTabId); break;
+    }
+  }
+  if (e.key === 'Escape') closeAllMenus();
+});
+
+require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.0/min/vs' } });
+require(['vs/editor/editor.main'], function () {
+  monaco.editor.defineTheme('bionic-dark', {
+    base: 'vs-dark', inherit: true,
+    rules: [
+      { token: 'comment',  foreground: '3DDC84', fontStyle: 'italic' },
+      { token: 'keyword',  foreground: '42A5F5', fontStyle: 'bold' }
+    ],
+    colors: { 'editor.background': '#1E1E1E' }
+  });
+  monaco.editor.defineTheme('ps-light', {
+    base: 'vs', inherit: true,
+    rules: [
+      { token: 'comment', foreground: '13A10E', fontStyle: 'italic' },
+      { token: 'keyword', foreground: '0037DA', fontStyle: 'bold' }
+    ],
+    colors: { 'editor.background': '#FFFFFF' }
+  });
+
+  const firstId = createTab('untitled-1.txt', '', null);
+  activeTabId = firstId;
+  renderTabs();
+  document.getElementById('new-tab-btn').addEventListener('click', addNewTab);
+
+  const firstTab = getActiveTab();
+  const firstUri = monaco.Uri.parse(\`file:///\${firstTab.id}\`);
+  const firstModel = monaco.editor.createModel(firstTab.content, firstTab.language, firstUri);
+
+  editor = monaco.editor.create(document.getElementById('monaco-container'), {
+    model: firstModel, theme: isDark ? 'bionic-dark' : 'ps-light',
+    fontFamily: "'Consolas', 'Courier New', monospace", fontSize: 14,
+    minimap: { enabled: showMinimap }, wordWrap: wordWrap ? 'on' : 'off',
+    lineNumbers: showLineNumbers ? 'on' : 'off', padding: { top: 0, bottom: 0 }
+  });
+
+  editor.onDidChangeCursorPosition(e => {
+    document.getElementById('status-cursor').textContent = \`Ln \${e.position.lineNumber}, Col \${e.position.column}\`;
+  });
+  window.addEventListener('resize', () => editor.layout());
+  applyTheme();
+  document.getElementById('status-lang').textContent = langLabel(firstTab.language);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Color Scheme Editor</title>
+    <meta name="description" content="Edit terminal colors and appearance" />
+    <meta name="applet-icon" content="Palette" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        html, body {
+            margin: 0; padding: 0;
+            overscroll-behavior: none;
+            user-select: none;
+            -webkit-user-select: none;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #202020;
+            color: #CCCCCC;
+        }
+        .scrollbar-none::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body>
+    <div id="app" class="flex flex-col h-screen overflow-hidden relative">
+        <header class="h-14 flex items-center px-4 shrink-0 shadow-sm relative z-10" style="background-color: #2D2D2D;">
+            <button onclick="goBack()" id="backBtn" class="mr-3 p-1.5 rounded hover:bg-white/10 hidden transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </button>
+            <div class="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-50 mt-0.5"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                <div class="text-xl font-semibold tracking-wide ml-2" id="headerTitle">Color schemes</div>
+            </div>
+        </header>
+
+        <main id="mainContainer" class="flex-1 overflow-y-auto scrollbar-none"></main>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'terminal_themes';
+        const ACTIVE_THEME_KEY = 'terminal_active_theme';
+
+        const DEFAULT_THEMES = [
+            {
+                name: "Campbell (Default)",
+                isDefault: true,
+                colors: { background: "#0C0C0C", foreground: "#CCCCCC", cursorColor: "#FFFFFF", selectionBackground: "#FFFFFF40", black: "#0C0C0C", brightBlack: "#767676", red: "#C50F1F", brightRed: "#E74856", green: "#13A10E", brightGreen: "#16C60C", yellow: "#C19C00", brightYellow: "#F9F1A5", blue: "#0037DA", brightBlue: "#3B78FF", purple: "#881798", brightPurple: "#B4009E", cyan: "#3A96DD", brightCyan: "#61D6D6", white: "#CCCCCC", brightWhite: "#F2F2F2" }
+            },
+            {
+                name: "Campbell PowerShell",
+                isDefault: false,
+                colors: { background: "#012456", foreground: "#CCCCCC", cursorColor: "#FFFFFF", selectionBackground: "#FFFFFF40", black: "#0C0C0C", brightBlack: "#767676", red: "#C50F1F", brightRed: "#E74856", green: "#13A10E", brightGreen: "#16C60C", yellow: "#C19C00", brightYellow: "#F9F1A5", blue: "#0037DA", brightBlue: "#3B78FF", purple: "#881798", brightPurple: "#B4009E", cyan: "#3A96DD", brightCyan: "#61D6D6", white: "#CCCCCC", brightWhite: "#F2F2F2" }
+            },
+            {
+                name: "Dark+",
+                isDefault: false,
+                colors: { background: "#1E1E1E", foreground: "#CCCCCC", cursorColor: "#FFFFFF", selectionBackground: "#FFFFFF40", black: "#000000", brightBlack: "#666666", red: "#CD3131", brightRed: "#F14C4C", green: "#0DBC79", brightGreen: "#23D18B", yellow: "#E5E510", brightYellow: "#F5F543", blue: "#2472C8", brightBlue: "#3B8EEA", purple: "#BC3FBC", brightPurple: "#D670D6", cyan: "#11A8CD", brightCyan: "#29B8DB", white: "#E5E5E5", brightWhite: "#E5E5E5" }
+            }
+        ];
+
+        let state = { view: 'LOADING', themes: [], editIndex: null };
+
+        const colorMapLeft = ['black', 'red', 'green', 'yellow', 'blue', 'purple', 'cyan', 'white'];
+        const colorLabelsLeft = ['Black', 'Red', 'Green', 'Yellow', 'Blue', 'Purple', 'Cyan', 'White'];
+        const colorMapRight = ['foreground', 'background', 'cursorColor', 'selectionBackground'];
+        const colorLabelsRight = ['Foreground', 'Background', 'Cursor color', 'Selection background'];
+
+        function fetchThemes() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                try { state.themes = JSON.parse(saved); } catch (e) { state.themes = [...DEFAULT_THEMES]; }
+            } else {
+                state.themes = JSON.parse(JSON.stringify(DEFAULT_THEMES));
+            }
+            state.view = 'LIST';
+            render();
+        }
+
+        function saveThemes() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state.themes));
+            if (state.editIndex !== null) {
+                applyTheme(state.editIndex);
+            }
+            goBack();
+        }
+
+        function applyTheme(index) {
+            const themeColors = state.themes[index].colors;
+            localStorage.setItem(ACTIVE_THEME_KEY, JSON.stringify(themeColors));
+            
+            if (window !== window.parent) {
+                window.parent.postMessage({ type: 'THEME_CHANGED', payload: themeColors }, '*');
+            }
+        }
+
+        function openEditor(index) {
+            state.view = 'EDIT';
+            state.editIndex = index;
+            render();
+        }
+
+        function createNewTheme() {
+            const newTheme = JSON.parse(JSON.stringify(DEFAULT_THEMES[0]));
+            newTheme.name = "Custom Theme " + (state.themes.length + 1);
+            newTheme.isDefault = false;
+            state.themes.push(newTheme);
+            state.view = 'EDIT';
+            state.editIndex = state.themes.length - 1;
+            render();
+        }
+
+        function goBack() {
+            state.view = 'LIST';
+            state.editIndex = null;
+            render();
+        }
+
+        function exitApplet() {
+            if (window !== window.parent) {
+                window.parent.postMessage('close-applet', '*');
+            }
+        }
+
+        let touchStartX = 0; let touchStartY = 0;
+        document.addEventListener('touchstart', e => {
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+        }, { passive: true });
+        
+        document.addEventListener('touchend', e => {
+            const dx = e.changedTouches[0].screenX - touchStartX;
+            const dy = Math.abs(e.changedTouches[0].screenY - touchStartY);
+            if (dx > 70 && dy < 50 && touchStartX < 50) {
+                if (state.view === 'EDIT') goBack();
+                else exitApplet();
+            }
+        }, { passive: true });
+
+        function render() {
+            const container = document.getElementById('mainContainer');
+            const title = document.getElementById('headerTitle');
+            const backBtn = document.getElementById('backBtn');
+
+            if (state.view === 'LIST') {
+                title.innerHTML = 'Color schemes';
+                backBtn.classList.add('hidden');
+                let html = \`<div class="px-6 py-6 pb-24" style="max-width: 800px; margin: 0 auto;">\` +
+                           \`<p class="text-[13px] text-gray-400 mb-6">Schemes defined here can be applied to your profiles under the "Appearances" section of the profile settings pages.</p>\` +
+                           \`<button onclick="createNewTheme()" class="flex items-center gap-2 px-4 py-2 rounded mb-8 transition-colors text-sm font-medium border border-white/10 hover:bg-white/5 bg-white/5"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>Add new</button>\` +
+                           \`<div class="flex flex-col gap-6">\`;
+
+                state.themes.forEach((theme, index) => {
+                    html += \`<div class="flex items-center gap-4 cursor-pointer group">
+                                <div onclick="applyTheme(\${index})" class="p-4 rounded-lg bg-[#191919] border border-transparent shadow shadow-black/20 group-hover:border-white/10 transition-colors w-fit flex flex-col gap-[2px]">
+                                    <div class="flex gap-[2px]">
+                                        \${colorMapLeft.map(c => \`<div class="w-[14px] h-[14px] rounded-[2px]" style="background-color: \${theme.colors[c]}"></div>\`).join('')}
+                                    </div>
+                                    <div class="flex gap-[2px]">
+                                        \${colorMapLeft.map(c => {
+                                            let b = 'bright' + c.charAt(0).toUpperCase() + c.slice(1);
+                                            return \`<div class="w-[14px] h-[14px] rounded-[2px]" style="background-color: \${theme.colors[b] ?? theme.colors[c]}"></div>\`;
+                                        }).join('')}
+                                    </div>
+                                </div>
+                                <div onclick="openEditor(\${index})" class="flex-1 text-[15px] font-medium text-gray-200 flex items-center justify-between">
+                                    <div>\${theme.name} \${theme.isDefault ? \`<span class="px-2 py-0.5 rounded text-[11px] border border-gray-500 text-gray-400 ml-2">default</span>\` : ''}</div>
+                                    <span class="opacity-0 group-hover:opacity-100 text-[11px] px-2 py-1 bg-white/10 rounded transition-opacity">Edit</span>
+                                </div>
+                            </div>\`;
+                });
+                html += \`</div></div>\`;
+                container.innerHTML = html;
+            } else if (state.view === 'EDIT') {
+                const theme = state.themes[state.editIndex];
+                title.innerHTML = \`Color schemes <span class="mx-2 opacity-50">›</span> \${theme.name}\`;
+                backBtn.classList.remove('hidden');
+
+                let html = \`<div class="px-6 py-6 pb-28 pt-2" style="max-width: 800px; margin: 0 auto;">
+                                <div class="rounded-md p-5 mb-8 shadow-inner shadow-black/40 border border-white/5 relative" style="background-color: \${theme.colors.background}; color: \${theme.colors.foreground}">
+                                    <div class="text-sm font-semibold mb-4 tracking-wide shadow-none bg-transparent">Foreground</div>
+                                    <div class="grid grid-cols-2 gap-y-2 text-[15px] font-mono leading-none shadow-none bg-transparent">\`;
+
+                for(let i=0; i<colorMapLeft.length; i++) {
+                    const c = colorMapLeft[i];
+                    const bc = 'bright' + c.charAt(0).toUpperCase() + c.slice(1);
+                    html += \`<div style="color: \${theme.colors[c]}">\${colorLabelsLeft[i]}</div>
+                             <div style="color: \${theme.colors[bc] ?? theme.colors[c]}">Bright \${c.toLowerCase()}</div>\`;
+                }
+
+                html += \`</div></div>
+                         <div class="bg-[#2D2D2D] rounded-t-lg px-5 py-3 flex items-center justify-between border-b border-[#121212]/30 mb-0 shadow-sm mt-6">
+                             <span class="text-sm font-medium">Colors</span>
+                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="opacity-50"><polyline points="18 15 12 9 6 15"></polyline></svg>
+                         </div>
+                         <div class="bg-[#2D2D2D] p-5 pt-3 rounded-b-lg shadow-sm border border-transparent grid grid-cols-1 md:grid-cols-2 gap-x-12 items-start">
+                             <div>\`;
+
+                for(let i=0; i<colorMapLeft.length; i++) {
+                    const c = colorMapLeft[i];
+                    const bc = 'bright' + c.charAt(0).toUpperCase() + c.slice(1);
+                    html += \`<div class="flex items-center justify-between py-3">
+                                 <span class="text-[13px] font-medium text-gray-300 w-24">\${colorLabelsLeft[i]}</span>
+                                 <div class="flex gap-3">
+                                     <label class="w-8 h-8 rounded shrink-0 border border-black/50 cursor-pointer overflow-hidden relative shadow-inner" style="background-color: \${theme.colors[c]};">
+                                         <input type="color" onchange="updateColor('\${c}', this.value)" value="\${theme.colors[c]}" class="absolute -top-4 -left-4 w-16 h-16 opacity-0 cursor-pointer border-none" />
+                                     </label>
+                                     <label class="w-8 h-8 rounded shrink-0 border border-black/50 cursor-pointer overflow-hidden relative shadow-inner" style="background-color: \${theme.colors[bc] ?? theme.colors[c]};">
+                                         <input type="color" onchange="updateColor('\${bc}', this.value)" value="\${theme.colors[bc] ?? theme.colors[c]}" class="absolute -top-4 -left-4 w-16 h-16 opacity-0 cursor-pointer border-none" />
+                                     </label>
+                                 </div>
+                             </div>\`;
+                }
+
+                html += \`</div><div>\`;
+
+                for(let i=0; i<colorMapRight.length; i++) {
+                    const c = colorMapRight[i];
+                    html += \`<div class="flex items-center justify-between py-3">
+                                 <span class="text-[13px] font-medium text-gray-300">\${colorLabelsRight[i]}</span>
+                                 <label class="w-8 h-8 rounded shrink-0 border border-black/50 cursor-pointer overflow-hidden relative shadow-inner" style="background-color: \${theme.colors[c]};">
+                                     <input type="color" onchange="updateColor('\${c}', this.value)" value="\${theme.colors[c]}" class="absolute -top-4 -left-4 w-16 h-16 opacity-0 cursor-pointer border-none" />
+                                 </label>
+                             </div>\`;
+                }
+
+                html += \`</div></div>
+                         <div class="fixed bottom-0 left-0 right-0 p-4 border-t border-[#151515] bg-[#2D2D2D] flex justify-end gap-3 z-20">
+                             <button onclick="saveThemes()" class="px-8 py-2 rounded bg-[#60A5FA] hover:bg-[#3B82F6] text-black text-[13px] font-semibold transition-colors">Save</button>
+                             <button onclick="goBack()" class="px-6 py-2 rounded bg-[#3D3D3D] hover:bg-[#4D4D4D] text-[#CCCCCC] text-[13px] font-semibold transition-colors border border-[#1A1A1A]/30">Discard changes</button>
+                         </div>
+                     </div>\`;
+
+                container.innerHTML = html;
+            }
+        }
+
+        window.updateColor = (key, val) => {
+            if (state.editIndex !== null) {
+                state.themes[state.editIndex].colors[key] = val.toUpperCase();
+                render();
+                if (window !== window.parent && (key === 'background' || key === 'foreground')) {
+                    window.parent.postMessage({ type: 'THEME_CHANGED', payload: state.themes[state.editIndex].colors }, '*');
+                }
+            }
+        };
+
+        fetchThemes();
+    </script>
+</body>
+</html>

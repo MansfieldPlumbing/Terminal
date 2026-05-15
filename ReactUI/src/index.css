@@ -1,21 +1,60 @@
 @import "tailwindcss";
 
-.bg-checkerboard { 
-    background-image: repeating-conic-gradient(#282828 0% 25%, transparent 0% 50%);
-    background-position: 0 0, 8px 8px;
-    background-size: 16px 16px;
+/* Hide scrollbar for xterm but allow scroll */
+.xterm-viewport::-webkit-scrollbar {
+  display: none !important;
+}
+.xterm-viewport {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
 }
 
+:root {
+  --mica-opacity: 0.50;
+  --mica-blur: 10px;
+}
+
+.text-shadow-mica {
+  color: #ffffff !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 1px rgba(0, 0, 0, 0.7);
+}
+
+.mica-panel {
+  background-color: rgba(30, 30, 30, var(--mica-opacity)) !important;
+  backdrop-filter: blur(var(--mica-blur)) !important;
+  -webkit-backdrop-filter: blur(var(--mica-blur)) !important;
+}
+
+.monaco-mica-minimap .minimap {
+  background: rgba(30, 30, 30, var(--mica-opacity)) !important;
+  backdrop-filter: blur(var(--mica-blur)) !important;
+  -webkit-backdrop-filter: blur(var(--mica-blur)) !important;
+}
+
+.mica-border {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none !important;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+/* Custom scrollbar for notepad */
 .custom-scrollbar::-webkit-scrollbar {
-    height: 6px;
+  width: 10px;
+  height: 10px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
+  background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 5px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.3);
 }
