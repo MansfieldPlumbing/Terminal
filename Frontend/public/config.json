@@ -1,0 +1,69 @@
+{
+  "$schema": "https://aka.ms/terminal-profiles-schema",
+  "profiles": {
+    "defaults": {
+      "colorScheme": "Bright",
+      "opacity": 80,
+      "useAcrylic": true
+    },
+    "list": [
+      {
+        "guid": "pwsh",
+        "name": "PWSH",
+        "commandline": "pwsh.exe",
+        "icon": "terminal",
+        "type": "terminal"
+      },
+      {
+        "guid": "editor",
+        "name": "Editor",
+        "icon": "file-text",
+        "type": "notepad"
+      },
+      {
+        "guid": "files",
+        "name": "Files",
+        "icon": "folder-tree",
+        "type": "explorer"
+      },
+      {
+        "guid": "colors",
+        "name": "Color Schemes",
+        "icon": "settings-2",
+        "type": "colors"
+      },
+      {
+        "guid": "nocap",
+        "name": "No Cap Tracks",
+        "icon": "clapperboard",
+        "type": "applet",
+        "path": "/applets/nocap.html"
+      }
+    ]
+  },
+  "schemes": [
+    {
+      "background": "#00001A",
+      "black": "#1FFF00",
+      "blue": "#0037DA",
+      "brightBlack": "#01FF00",
+      "brightBlue": "#3B78FF",
+      "brightCyan": "#61D6D6",
+      "brightGreen": "#16C60C",
+      "brightPurple": "#B4009E",
+      "brightRed": "#E74856",
+      "brightWhite": "#F2F2F2",
+      "brightYellow": "#F9F1A5",
+      "cursorColor": "#FFFFFF",
+      "cyan": "#3A96DD",
+      "foreground": "#FFFFFF",
+      "green": "#13A10E",
+      "name": "Bright",
+      "purple": "#881798",
+      "red": "#C50F1F",
+      "selectionBackground": "#FFFFFF",
+      "white": "#FFFFFF",
+      "yellow": "#C19C00"
+    }
+  ]
+}

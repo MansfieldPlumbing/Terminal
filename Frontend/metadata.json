@@ -1,0 +1,8 @@
+{
+  "name": "Terminal",
+  "description": "A Micro-Frontend Operating Environment for Android, powered by .NET and PowerShell 7.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

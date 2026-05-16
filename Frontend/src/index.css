@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+:root {
+  --mica-opacity: 0.85;
+  --mica-blur: 12px;
+  --mica-bg-r: 20;
+  --mica-bg-g: 36;
+  --mica-bg-b: 75;
+}
+
+.text-shadow-mica {
+  color: #ffffff !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 1px rgba(0, 0, 0, 0.7);
+}
+
+.mica-panel {
+  background-color: rgba(var(--mica-bg-r), var(--mica-bg-g), var(--mica-bg-b), var(--mica-opacity)) !important;
+  backdrop-filter: blur(var(--mica-blur)) !important;
+  -webkit-backdrop-filter: blur(var(--mica-blur)) !important;
+}
+
+.monaco-mica-minimap .minimap {
+  background: rgba(var(--mica-bg-r), var(--mica-bg-g), var(--mica-bg-b), var(--mica-opacity)) !important;
+  backdrop-filter: blur(var(--mica-blur)) !important;
+  -webkit-backdrop-filter: blur(var(--mica-blur)) !important;
+}
+
+.mica-border {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0px !important;
+  height: 0px !important;
+  appearance: none !important;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+/* Custom scrollbar for notepad */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.sky-container {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: -20;
+  background: linear-gradient(to bottom, #1155cc 0%, #3080ff 50%, #66aaff 100%);
+  opacity: 1;
+}
+
+.cloud-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 200%;
+  background-image: url('data:image/svg+xml,%3Csvg viewBox="0 0 400 100" xmlns="http://www.w3.org/2000/svg"%3E%3Cpath d="M 40 60 A 15 15 0 0 1 65 45 A 25 25 0 0 1 110 50 A 15 15 0 0 1 125 70 A 10 10 0 0 1 115 80 L 50 80 A 12 12 0 0 1 40 60 Z" fill="%23ffffff" opacity="0.95" /%3E%3Cpath d="M 210 40 A 12 12 0 0 1 230 30 A 20 20 0 0 1 270 35 A 15 15 0 0 1 285 55 A 10 10 0 0 1 275 65 L 220 65 A 12 12 0 0 1 210 40 Z" fill="%23ffffff" /%3E%3Cpath d="M 330 65 A 10 10 0 0 1 350 55 A 18 18 0 0 1 385 60 A 15 15 0 0 1 400 75 A 10 10 0 0 1 390 85 L 340 85 A 10 10 0 0 1 330 65 Z" fill="%23ffffff" opacity="0.85" /%3E%3C/svg%3E');
+  background-size: 400px 100%;
+  background-repeat: repeat-x;
+  animation: slideClouds 15s linear infinite;
+}
+
+@keyframes slideClouds {
+  from { transform: translateX(0); }
+  to { transform: translateX(-400px); }
+}

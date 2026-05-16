@@ -1,0 +1,13 @@
+node_modules/
+dist/
+dist-ssr/
+*.local
+.env*
+!.env.example
+.DS_Store
+Thumbs.db
+*.log
+coverage/
+build/
+server.cjs
+server.js
