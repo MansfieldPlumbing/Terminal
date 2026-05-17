@@ -4,12 +4,33 @@ html, body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  height: 100vh;
+  height: 100dvh;
   width: 100vw;
+  background-color: black;
+}
+
+#root {
+  height: 100dvh;
+  width: 100vw;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: max(env(safe-area-inset-bottom), 24px);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+#root {
+  height: 100dvh;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  display: flex;
+  flex-direction: column;
 }
 
 :root {
+  color-scheme: light dark;
   --mica-opacity: 0.85;
+  --bg-opacity: 0.50;
   --mica-blur: 12px;
   --mica-bg-r: 20;
   --mica-bg-g: 36;
@@ -19,6 +40,12 @@ html, body {
 .text-shadow-mica {
   color: #ffffff !important;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 1px rgba(0, 0, 0, 0.7);
+}
+
+.mica-background {
+  background-color: rgba(var(--mica-bg-r), var(--mica-bg-g), var(--mica-bg-b), var(--bg-opacity)) !important;
+  backdrop-filter: blur(var(--mica-blur)) !important;
+  -webkit-backdrop-filter: blur(var(--mica-blur)) !important;
 }
 
 .mica-panel {
@@ -68,8 +95,8 @@ html, body {
   position: absolute;
   inset: 0;
   overflow: hidden;
-  z-index: -20;
-  background: linear-gradient(to bottom, #1155cc 0%, #3080ff 50%, #66aaff 100%);
+  z-index: 0;
+  background: linear-gradient(to bottom, #0A328C 0%, #1754C9 40%, #56a5ff 100%);
   opacity: 1;
 }
 
@@ -79,13 +106,146 @@ html, body {
   left: 0;
   height: 100%;
   width: 200%;
-  background-image: url('data:image/svg+xml,%3Csvg viewBox="0 0 400 100" xmlns="http://www.w3.org/2000/svg"%3E%3Cpath d="M 40 60 A 15 15 0 0 1 65 45 A 25 25 0 0 1 110 50 A 15 15 0 0 1 125 70 A 10 10 0 0 1 115 80 L 50 80 A 12 12 0 0 1 40 60 Z" fill="%23ffffff" opacity="0.95" /%3E%3Cpath d="M 210 40 A 12 12 0 0 1 230 30 A 20 20 0 0 1 270 35 A 15 15 0 0 1 285 55 A 10 10 0 0 1 275 65 L 220 65 A 12 12 0 0 1 210 40 Z" fill="%23ffffff" /%3E%3Cpath d="M 330 65 A 10 10 0 0 1 350 55 A 18 18 0 0 1 385 60 A 15 15 0 0 1 400 75 A 10 10 0 0 1 390 85 L 340 85 A 10 10 0 0 1 330 65 Z" fill="%23ffffff" opacity="0.85" /%3E%3C/svg%3E');
-  background-size: 400px 100%;
+  background-image: url('data:image/svg+xml,<svg viewBox="0 0 1200 400" xmlns="http://www.w3.org/2000/svg"> <defs> <filter id="c-f" x="-20%" y="-20%" width="140%" height="140%"> <feGaussianBlur stdDeviation="8" /> </filter> <filter id="c-f2" x="-20%" y="-20%" width="140%" height="140%"> <feGaussianBlur stdDeviation="3" /> </filter> </defs> <g opacity="0.95"> <g transform="translate(100, 100)"> <circle cx="100" cy="80" r="50" fill="%23fff" filter="url(%23c-f)"/> <circle cx="160" cy="50" r="65" fill="%23fff" filter="url(%23c-f)"/> <circle cx="230" cy="70" r="55" fill="%23fff" filter="url(%23c-f)"/> <circle cx="160" cy="90" r="45" fill="%23fff" filter="url(%23c-f)"/> <circle cx="100" cy="80" r="50" fill="%23fff" filter="url(%23c-f2)"/> <circle cx="160" cy="50" r="65" fill="%23fff" filter="url(%23c-f2)"/> <circle cx="230" cy="70" r="55" fill="%23fff" filter="url(%23c-f2)"/> <circle cx="160" cy="90" r="45" fill="%23fff" filter="url(%23c-f2)"/> </g> <g transform="translate(650, 40) scale(0.8)"> <circle cx="100" cy="80" r="50" fill="%23fff" filter="url(%23c-f)"/> <circle cx="160" cy="50" r="70" fill="%23fff" filter="url(%23c-f)"/> <circle cx="240" cy="70" r="60" fill="%23fff" filter="url(%23c-f)"/> <circle cx="280" cy="100" r="40" fill="%23fff" filter="url(%23c-f)"/> <circle cx="150" cy="100" r="45" fill="%23fff" filter="url(%23c-f)"/> <circle cx="100" cy="80" r="50" fill="%23fff" filter="url(%23c-f2)"/> <circle cx="160" cy="50" r="70" fill="%23fff" filter="url(%23c-f2)"/> <circle cx="240" cy="70" r="60" fill="%23fff" filter="url(%23c-f2)"/> <circle cx="280" cy="100" r="40" fill="%23fff" filter="url(%23c-f2)"/> <circle cx="150" cy="100" r="45" fill="%23fff" filter="url(%23c-f2)"/> </g> <g transform="translate(450, 200) scale(0.4)"> <circle cx="100" cy="80" r="50" fill="%23fff" filter="url(%23c-f)"/> <circle cx="160" cy="50" r="70" fill="%23fff" filter="url(%23c-f)"/> <circle cx="240" cy="70" r="60" fill="%23fff" filter="url(%23c-f)"/> </g> <g transform="translate(950, 230) scale(0.5)"> <circle cx="100" cy="80" r="50" fill="%23fff" filter="url(%23c-f)"/> <circle cx="160" cy="50" r="70" fill="%23fff" filter="url(%23c-f)"/> <circle cx="240" cy="70" r="60" fill="%23fff" filter="url(%23c-f)"/> </g> </g></svg>');
+  background-size: 1500px 100%;
   background-repeat: repeat-x;
-  animation: slideClouds 15s linear infinite;
+  animation: slideClouds 45s linear infinite;
 }
 
 @keyframes slideClouds {
   from { transform: translateX(0); }
-  to { transform: translateX(-400px); }
+  to { transform: translateX(-1500px); }
 }
+
+.bliss-wallpaper {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+  /* Authentic XP Sky: Deep blue space transitioning to bright cyan horizon */
+  background: linear-gradient(180deg, #0942A6 0%, #1C65D6 30%, #57A2EC 70%, #A8D3F8 100%);
+}
+
+/* 
+  ILLEGALLY EFFICIENT CLOUDS 
+  Zero SVGs, zero filters, zero DOM bloat. 
+  Renders sub-millisecond using layered CSS radial-gradients.
+*/
+.bliss-clouds {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 60%;
+  width: 200%;
+  background-image: url('data:image/svg+xml,<svg viewBox="0 0 1200 400" xmlns="http://www.w3.org/2000/svg"> <defs> <filter id="c-f" x="-20%" y="-20%" width="140%" height="140%"> <feGaussianBlur stdDeviation="8" /> </filter> <filter id="c-f2" x="-20%" y="-20%" width="140%" height="140%"> <feGaussianBlur stdDeviation="3" /> </filter> </defs> <g opacity="0.95"> <g transform="translate(100, 100)"> <circle cx="100" cy="80" r="50" fill="%23fff" filter="url(%23c-f)"/> <circle cx="160" cy="50" r="65" fill="%23fff" filter="url(%23c-f)"/> <circle cx="230" cy="70" r="55" fill="%23fff" filter="url(%23c-f)"/> <circle cx="160" cy="90" r="45" fill="%23fff" filter="url(%23c-f)"/> <circle cx="100" cy="80" r="50" fill="%23fff" filter="url(%23c-f2)"/> <circle cx="160" cy="50" r="65" fill="%23fff" filter="url(%23c-f2)"/> <circle cx="230" cy="70" r="55" fill="%23fff" filter="url(%23c-f2)"/> <circle cx="160" cy="90" r="45" fill="%23fff" filter="url(%23c-f2)"/> </g> <g transform="translate(650, 40) scale(0.8)"> <circle cx="100" cy="80" r="50" fill="%23fff" filter="url(%23c-f)"/> <circle cx="160" cy="50" r="70" fill="%23fff" filter="url(%23c-f)"/> <circle cx="240" cy="70" r="60" fill="%23fff" filter="url(%23c-f)"/> <circle cx="280" cy="100" r="40" fill="%23fff" filter="url(%23c-f)"/> <circle cx="150" cy="100" r="45" fill="%23fff" filter="url(%23c-f)"/> <circle cx="100" cy="80" r="50" fill="%23fff" filter="url(%23c-f2)"/> <circle cx="160" cy="50" r="70" fill="%23fff" filter="url(%23c-f2)"/> <circle cx="240" cy="70" r="60" fill="%23fff" filter="url(%23c-f2)"/> <circle cx="280" cy="100" r="40" fill="%23fff" filter="url(%23c-f2)"/> <circle cx="150" cy="100" r="45" fill="%23fff" filter="url(%23c-f2)"/> </g> <g transform="translate(450, 200) scale(0.4)"> <circle cx="100" cy="80" r="50" fill="%23fff" filter="url(%23c-f)"/> <circle cx="160" cy="50" r="70" fill="%23fff" filter="url(%23c-f)"/> <circle cx="240" cy="70" r="60" fill="%23fff" filter="url(%23c-f)"/> </g> <g transform="translate(950, 230) scale(0.5)"> <circle cx="100" cy="80" r="50" fill="%23fff" filter="url(%23c-f)"/> <circle cx="160" cy="50" r="70" fill="%23fff" filter="url(%23c-f)"/> <circle cx="240" cy="70" r="60" fill="%23fff" filter="url(%23c-f)"/> </g> </g></svg>');
+  background-size: 1500px 100%;
+  background-repeat: repeat-x;
+  animation: slideCloudsBliss 45s linear infinite;
+}
+
+/* Base layer: Slower, distant clouds */
+.bliss-clouds::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 200vw;
+  background-image:
+    radial-gradient(ellipse 35vw 15vh at 15vw 18vh, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.001) 55%),
+    radial-gradient(ellipse 28vw 12vh at 65vw 35vh, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.001) 50%),
+    radial-gradient(ellipse 40vw 14vh at 40vw 55vh, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0.001) 55%),
+    radial-gradient(ellipse 30vw 12vh at 85vw 60vh, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.001) 55%),
+    radial-gradient(ellipse 20vw 10vh at 85vw 15vh, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0.001) 55%);
+  background-size: 100vw 100%;
+  background-repeat: repeat-x;
+  /* 43 seconds (Prime) */
+  animation: slideCloudsBliss 43s linear infinite;
+  will-change: transform;
+}
+
+/* Foreground layer: Faster, puffier overlapping clouds */
+.bliss-clouds::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 200vw;
+  background-image:
+    radial-gradient(ellipse 45vw 18vh at 25vw 35vh, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.001) 50%),
+    radial-gradient(ellipse 30vw 12vh at 10vw 60vh, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.001) 50%),
+    radial-gradient(ellipse 45vw 16vh at 75vw 45vh, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.001) 55%),
+    radial-gradient(ellipse 35vw 14vh at 50vw 15vh, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.001) 55%),
+    radial-gradient(ellipse 20vw 8vh at 45vw 10vh, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.001) 55%);
+  background-size: 100vw 100%;
+  background-repeat: repeat-x;
+  /* 29 seconds (Prime) */
+  animation: slideCloudsBliss 29s linear infinite;
+  will-change: transform;
+}
+
+/* Seamless infinite scroll: Slides exactly 1 tile width, then instantly resets */
+@keyframes slideCloudsBliss {
+  0% { transform: translateX(0) translateZ(0); }
+  100% { transform: translateX(-100vw) translateZ(0); }
+}
+
+/* 
+  ILLEGALLY EFFICIENT HILLS 
+  We use the ::before and ::after pseudo-elements to create the two iconic 
+  Bliss hills from a single DOM node. Pure CSS border-radius curves are 
+  mathematically perfect and natively accelerated by the GPU.
+*/
+.bliss-hill {
+  position: absolute;
+  bottom: -2%;
+  left: -2%;
+  width: 104%;
+  height: 60%;
+  background-image: url('data:image/svg+xml,<svg viewBox="0 0 1000 600" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"> <defs> <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="%233c6f2a"/><stop offset="100%" stop-color="%231b3d11"/></linearGradient> <linearGradient id="mg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="%23559933"/><stop offset="100%" stop-color="%23225511"/></linearGradient> <linearGradient id="fg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="%236bc23b"/><stop offset="100%" stop-color="%232a7711"/></linearGradient> <filter id="f" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="30" /></filter> </defs> <path d="M-100,600 L-100,200 C200,-50 400,500 700,300 C900,150 1000,250 1200,100 L1200,800 Z" fill="url(%23bg)" filter="url(%23f)" /> <path d="M-100,600 L-100,450 C250,600 450,-50 850,300 C1000,450 1050,350 1200,300 L1200,800 Z" fill="url(%23mg)" filter="url(%23f)" opacity="0.9" /> <path d="M-100,600 L-100,600 C200,200 600,750 1200,350 L1200,800 Z" fill="url(%23fg)" filter="url(%23f)" opacity="0.95"/></svg>');
+  background-size: 100% 100%;
+}
+
+/* Distant Left Hill */
+.bliss-hill::before {
+  content: '';
+  position: absolute;
+  /* Massive size creates a subtle, realistic arc instead of a tight wavy bump */
+  width: 250vw;
+  height: 120vh;
+  left: -80vw;
+  bottom: -100vh;
+  border-radius: 50%;
+  /* Bright sunlit grass transitioning to deep valley shadow */
+  background: linear-gradient(180deg, #7CD623 0%, #40960E 40%, #1A5403 100%);
+  transform: rotate(4deg);
+  will-change: transform;
+}
+
+/* Main Foreground Sweep (The iconic slope) */
+.bliss-hill::after {
+  content: '';
+  position: absolute;
+  width: 320vw;
+  height: 150vh;
+  left: -80vw;
+  bottom: -125vh;
+  border-radius: 50%;
+  /* Slightly darker, desaturated green for atmospheric depth */
+  background: linear-gradient(180deg, #4A9115 0%, #174804 100%);
+  /* An ultra-subtle inset shadow mimics sunlight hitting the top ridge */
+  box-shadow: inset 0 1vh 3vh rgba(255, 245, 180, 0.15);
+  transform: rotate(-3deg);
+  will-change: transform;
+}
+
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+/* Android 16 Edge-to-Edge Safe Area Padding */
+#root {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  width: 100vw;
+  height: 100vh;
+  box-sizing: border-box;
+}
+

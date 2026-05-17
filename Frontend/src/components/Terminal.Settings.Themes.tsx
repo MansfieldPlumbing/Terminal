@@ -94,7 +94,7 @@ const ColorSwatchBlock: React.FC<{ colors: Record<string, string>, isSelected?: 
   </div>
 );
 
-export default function NativeColorSchemeEditor({ tab }: { tab: Tab }) {
+export default function NativeColorSchemeEditor({ tab, hideSystemAppearance = false }: { tab: Tab, hideSystemAppearance?: boolean }) {
   const {
     micaOpacity, setMicaOpacity,
     micaBlur, setMicaBlur,
@@ -155,121 +155,123 @@ export default function NativeColorSchemeEditor({ tab }: { tab: Tab }) {
   };
 
   return (
-    <div className="flex flex-col text-[#CCCCCC] font-sans selection:bg-blue-500/30">
-      <div className="flex-1">
+    <div className="flex flex-col text-[#CCCCCC] font-sans selection:bg-blue-500/30 w-full">
+      <div className="flex-1 w-full">
         {view === 'LIST' && (
-          <div className="flex flex-col gap-10">
-            <div>
-              <div className="bg-[#2D2D2D] px-5 py-3 flex items-center justify-between border-b border-[#121212]/30 shadow-sm mb-0">
-                <span className="text-sm font-medium text-white">System Appearance</span>
-              </div>
-              <div className="bg-[#1E1E1E] p-6 shadow-sm border border-[#2D2D2D] flex flex-col gap-6">
-                
-                {/* UI Scale / Density */}
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between text-sm font-medium text-gray-300">
-                    <span>UI Scale & Font Size</span>
-                    <span className="font-mono text-gray-400 w-12 text-right">{(uiScale * 100).toFixed(0)}%</span>
-                  </div>
-                  <WinSlider 
-                    min={0.5} max={1.5} step={0.05} 
-                    value={uiScale} onChange={setUiScale} 
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Adjusts the overall density, font sizes, and context menu sizing globally.</p>
+          <div className="flex flex-col gap-10 w-full">
+            {!hideSystemAppearance && (
+              <div>
+                <div className="bg-white/5 px-5 py-3 flex items-center justify-between border-b border-[#121212]/30 shadow-sm mb-0">
+                  <span className="text-sm font-medium text-white">System Appearance</span>
                 </div>
-
-                <div className="h-px bg-white/10 my-2" />
-
-                {/* Mica Controls */}
-                <div className="flex flex-col gap-8">
-                  <div className="flex flex-col md:flex-row gap-8">
-                    <div className="flex flex-col gap-2 flex-1">
-                      <div className="flex items-center justify-between text-sm font-medium text-gray-300">
-                        <span>Panel Opacity</span>
-                        <span className="font-mono text-gray-400 w-12 text-right">{(micaOpacity * 100).toFixed(0)}%</span>
-                      </div>
-                      <WinSlider 
-                        min={0} max={1} step={0.05} 
-                        value={micaOpacity} onChange={setMicaOpacity} 
-                      />
+                <div className="bg-transparent p-6 shadow-sm border border-[#2D2D2D] flex flex-col gap-6">
+                  
+                  {/* UI Scale / Density */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between text-sm font-medium text-gray-300">
+                      <span>UI Scale & Font Size</span>
+                      <span className="font-mono text-gray-400 w-12 text-right">{(uiScale * 100).toFixed(0)}%</span>
                     </div>
-                    
-                    <div className="flex flex-col gap-2 flex-1">
-                      <div className="flex items-center justify-between text-sm font-medium text-gray-300">
-                        <span>Mica Blur Radius</span>
-                        <span className="font-mono text-gray-400 w-12 text-right">{micaBlur}px</span>
+                    <WinSlider 
+                      min={0.5} max={1.5} step={0.05} 
+                      value={uiScale} onChange={setUiScale} 
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Adjusts the overall density, font sizes, and context menu sizing globally.</p>
+                  </div>
+  
+                  <div className="h-px bg-white/10 my-2" />
+  
+                  {/* Mica Controls */}
+                  <div className="flex flex-col gap-8">
+                    <div className="flex flex-col md:flex-row gap-8">
+                      <div className="flex flex-col gap-2 flex-1">
+                        <div className="flex items-center justify-between text-sm font-medium text-gray-300">
+                          <span>Panel Opacity</span>
+                          <span className="font-mono text-gray-400 w-12 text-right">{(micaOpacity * 100).toFixed(0)}%</span>
+                        </div>
+                        <WinSlider 
+                          min={0} max={1} step={0.05} 
+                          value={micaOpacity} onChange={setMicaOpacity} 
+                        />
                       </div>
-                      <WinSlider 
-                        min={0} max={32} step={1} 
-                        value={micaBlur} onChange={setMicaBlur} 
-                      />
+                      
+                      <div className="flex flex-col gap-2 flex-1">
+                        <div className="flex items-center justify-between text-sm font-medium text-gray-300">
+                          <span>Mica Blur Radius</span>
+                          <span className="font-mono text-gray-400 w-12 text-right">{micaBlur}px</span>
+                        </div>
+                        <WinSlider 
+                          min={0} max={32} step={1} 
+                          value={micaBlur} onChange={setMicaBlur} 
+                        />
+                      </div>
+                    </div>
+  
+                    {/* Panel Base Tint */}
+                    <div className="flex flex-col gap-4">
+                      <div>
+                        <div className="text-sm font-medium text-gray-300">Panel Base Tint</div>
+                        <p className="text-xs text-gray-500 mt-1">Controls the background tint of context menus, dialogs, and floating panels.</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 max-w-[280px]">
+                        {[
+                          { r: 24, g: 24, b: 24, name: 'Dark Gray' },
+                          { r: 0, g: 0, b: 0, name: 'Black' },
+                          { r: 20, g: 36, b: 75, name: 'Deep Blue' },
+                          { r: 0, g: 45, b: 90, name: 'Navy' },
+                          { r: 40, g: 20, b: 50, name: 'Plum Purple' },
+                          { r: 60, g: 20, b: 80, name: 'Deep Purple' },
+                          { r: 60, g: 15, b: 30, name: 'Crimson' },
+                          { r: 80, g: 20, b: 20, name: 'Dark Red' },
+                          { r: 20, g: 50, b: 30, name: 'Forest Green' },
+                          { r: 15, g: 60, b: 45, name: 'Emerald' },
+                          { r: 30, g: 40, b: 40, name: 'Slate Teal' },
+                          { r: 10, g: 50, b: 60, name: 'Deep Teal' },
+                          { r: 45, g: 35, b: 25, name: 'Brown' },
+                          { r: 50, g: 40, b: 20, name: 'Bronze' },
+                          { r: 45, g: 55, b: 65, name: 'Graphite' },
+                          { r: 40, g: 50, b: 70, name: 'Slate Blue' }
+                        ].map((color, i) => {
+                          const isMatch = Math.abs(micaBaseColor.r - color.r) < 5 && Math.abs(micaBaseColor.g - color.g) < 5 && Math.abs(micaBaseColor.b - color.b) < 5;
+                          return (
+                            <button
+                              key={i}
+                              onClick={() => setMicaBaseColor({ r: color.r, g: color.g, b: color.b })}
+                              className={cn(
+                                "w-[26px] h-[26px] rounded-[4px] border-2 transition-all cursor-pointer shadow-sm relative",
+                                isMatch ? "border-[#60cdff] scale-110 z-10" : "border-white/10 hover:border-white/30 hover:scale-105"
+                              )}
+                              style={{ backgroundColor: `rgb(${color.r}, ${color.g}, ${color.b})` }}
+                              title={color.name}
+                            >
+                              {isMatch && <div className="absolute inset-0 flex items-center justify-center opacity-80"><div className="w-1.5 h-1.5 bg-[#60cdff] rounded-full shadow-[0_0_5px_#60cdff]"></div></div>}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
-
-                  {/* Panel Base Tint */}
-                  <div className="flex flex-col gap-4">
+  
+                  <div className="h-px bg-white/10 my-1" />
+                  
+                  {/* Mica Tab Bar */}
+                  <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-sm font-medium text-gray-300">Panel Base Tint</div>
-                      <p className="text-xs text-gray-500 mt-1">Controls the background tint of context menus, dialogs, and floating panels.</p>
+                      <div className="text-sm font-medium text-gray-300">Mica Tab Bar</div>
+                      <div className="text-xs text-gray-500 mt-0.5">Enable translucent tab bar with animated clouds</div>
                     </div>
-                    <div className="flex flex-wrap gap-2 max-w-[280px]">
-                      {[
-                        { r: 24, g: 24, b: 24, name: 'Dark Gray' },
-                        { r: 0, g: 0, b: 0, name: 'Black' },
-                        { r: 20, g: 36, b: 75, name: 'Deep Blue' },
-                        { r: 0, g: 45, b: 90, name: 'Navy' },
-                        { r: 40, g: 20, b: 50, name: 'Plum Purple' },
-                        { r: 60, g: 20, b: 80, name: 'Deep Purple' },
-                        { r: 60, g: 15, b: 30, name: 'Crimson' },
-                        { r: 80, g: 20, b: 20, name: 'Dark Red' },
-                        { r: 20, g: 50, b: 30, name: 'Forest Green' },
-                        { r: 15, g: 60, b: 45, name: 'Emerald' },
-                        { r: 30, g: 40, b: 40, name: 'Slate Teal' },
-                        { r: 10, g: 50, b: 60, name: 'Deep Teal' },
-                        { r: 45, g: 35, b: 25, name: 'Brown' },
-                        { r: 50, g: 40, b: 20, name: 'Bronze' },
-                        { r: 45, g: 55, b: 65, name: 'Graphite' },
-                        { r: 40, g: 50, b: 70, name: 'Slate Blue' }
-                      ].map((color, i) => {
-                        const isMatch = Math.abs(micaBaseColor.r - color.r) < 5 && Math.abs(micaBaseColor.g - color.g) < 5 && Math.abs(micaBaseColor.b - color.b) < 5;
-                        return (
-                          <button
-                            key={i}
-                            onClick={() => setMicaBaseColor({ r: color.r, g: color.g, b: color.b })}
-                            className={cn(
-                              "w-[26px] h-[26px] rounded-[4px] border-2 transition-all cursor-pointer shadow-sm relative",
-                              isMatch ? "border-[#60cdff] scale-110 z-10" : "border-white/10 hover:border-white/30 hover:scale-105"
-                            )}
-                            style={{ backgroundColor: `rgb(${color.r}, ${color.g}, ${color.b})` }}
-                            title={color.name}
-                          >
-                            {isMatch && <div className="absolute inset-0 flex items-center justify-center opacity-80"><div className="w-1.5 h-1.5 bg-[#60cdff] rounded-full shadow-[0_0_5px_#60cdff]"></div></div>}
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <WinToggle checked={autoHideTabs} onChange={setAutoHideTabs} />
                   </div>
+  
                 </div>
-
-                <div className="h-px bg-white/10 my-1" />
-                
-                {/* Mica Tab Bar */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium text-gray-300">Mica Tab Bar</div>
-                    <div className="text-xs text-gray-500 mt-0.5">Enable translucent tab bar with animated clouds</div>
-                  </div>
-                  <WinToggle checked={autoHideTabs} onChange={setAutoHideTabs} />
-                </div>
-
               </div>
-            </div>
+            )}
 
             <div>
-              <div className="bg-[#2D2D2D] px-5 py-3 flex items-center justify-between border-t border-[#121212]/30 shadow-sm mb-0">
+              <div className="bg-white/5 px-5 py-3 flex items-center justify-between border-b md:border-t border-[#121212]/30 shadow-sm mb-0">
                 <span className="text-sm font-medium text-white">Terminal Color Schemes</span>
               </div>
-              <div className="bg-[#1E1E1E] p-6 shadow-sm border border-[#2D2D2D]">
+              <div className="bg-transparent p-6 shadow-sm border border-[#2D2D2D]">
                 <p className="text-[13px] text-gray-400 mb-6">Schemes defined here can be applied to your profiles under the "Appearances" section of the profile settings pages.</p>
                 
                 <button 
@@ -327,12 +329,12 @@ export default function NativeColorSchemeEditor({ tab }: { tab: Tab }) {
               </div>
             </div>
 
-            <div className="bg-[#2D2D2D] rounded-t-lg px-5 py-3 flex items-center justify-between border-b border-[#121212]/30 mb-0 shadow-sm mt-6">
+            <div className="bg-white/5 rounded-t-lg px-5 py-3 flex items-center justify-between border-b border-[#121212]/30 mb-0 shadow-sm mt-6">
               <span className="text-sm font-medium">Colors</span>
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="opacity-50"><polyline points="18 15 12 9 6 15"></polyline></svg>
             </div>
             
-            <div className="bg-[#2D2D2D] p-5 pt-3 rounded-b-lg shadow-sm border border-transparent grid grid-cols-1 md:grid-cols-2 gap-x-12 items-start">
+            <div className="bg-white/5 p-5 pt-3 rounded-b-lg shadow-sm border border-transparent grid grid-cols-1 md:grid-cols-2 gap-x-12 items-start">
               <div>
                 {colorMapLeft.map((c, i) => {
                   const bc = 'bright' + c.charAt(0).toUpperCase() + c.slice(1);
@@ -364,7 +366,7 @@ export default function NativeColorSchemeEditor({ tab }: { tab: Tab }) {
               </div>
             </div>
 
-            <div className="fixed bottom-0 left-0 right-0 p-4 border-t border-[#151515] bg-[#2D2D2D] flex justify-end gap-3 z-20">
+            <div className="fixed bottom-0 left-0 right-0 p-4 border-t border-[#151515] bg-white/5 flex justify-end gap-3 z-20">
               <button 
                 onClick={saveThemes} 
                 className="px-8 py-2 rounded bg-[#60A5FA] hover:bg-[#3B82F6] text-black text-[13px] font-semibold transition-colors"

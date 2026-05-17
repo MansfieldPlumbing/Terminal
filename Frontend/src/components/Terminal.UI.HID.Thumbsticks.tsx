@@ -221,6 +221,9 @@ export default function Thumbstick() {
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       >
+        {/* Continuous hit area to ensure the rim registers pointers robustly */}
+        <div className={cn("absolute inset-0 rounded-full", isNestled ? "pointer-events-none" : "pointer-events-auto")} />
+
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div 
             ref={nubRef}

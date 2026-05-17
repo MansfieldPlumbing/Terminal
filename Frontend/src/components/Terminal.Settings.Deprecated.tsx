@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Settings2, Keyboard, LayoutTemplate, ShieldAlert, Activity, Monitor, Palette, Gamepad2, ChevronRight, ChevronLeft, Info, Terminal } from 'lucide-react';
+import { Settings2, Keyboard, LayoutTemplate, ShieldAlert, Activity, Monitor, Palette, Gamepad2, ChevronRight, ChevronLeft, Info, Terminal, FlaskConical } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAppStore } from '../System.Store';
 import { cn } from '../System.Utils';
 import NativeColorSchemeEditor, { WinToggle, WinSlider } from './Terminal.Settings.Themes';
+import { SmokeTestApp } from '../smoke_test/SmokeTest.Renderer';
 
 export default function SettingsTab() {
   const { 
@@ -15,6 +16,7 @@ export default function SettingsTab() {
   } = useAppStore();
 
   const [activeTab, setActiveTab] = useState<'root'|'about'|'personalization'|'controls'|'canvas_host'>('root');
+  const [useSmokeTest, setUseSmokeTest] = useState(false);
 
   const renderCategoryCard = (id: typeof activeTab, icon: React.ReactNode, title: string, description: string) => {
     return (
@@ -49,8 +51,36 @@ export default function SettingsTab() {
     </div>
   );
 
+  if (useSmokeTest) {
+     return (
+        <div className="flex flex-col w-full h-full bg-transparent text-white font-sans overflow-hidden">
+           <div className="flex items-center justify-between p-4 border-b border-white/10 bg-white/5 mx-4 mt-4 rounded-xl shadow-sm">
+              <div className="flex items-center gap-3">
+                 <div className="bg-pink-500/20 p-2 rounded-lg text-pink-400">
+                   <FlaskConical size={18} />
+                 </div>
+                 <div>
+                    <div className="font-semibold text-sm">Algebraic INI Renderer Active</div>
+                    <div className="text-xs text-white/50">Running purely on config-driven generic UI primitive rendering</div>
+                 </div>
+              </div>
+              <button 
+                 onClick={() => setUseSmokeTest(false)} 
+                 className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition-colors"
+              >
+                 Revert to React native views
+              </button>
+           </div>
+           
+           <div className="flex-1 relative mt-4">
+              <SmokeTestApp inPanel={true} />
+           </div>
+        </div>
+     );
+  }
+
   return (
-    <div className="flex w-full h-full bg-[#1c1c1c] text-white font-sans overflow-x-hidden overflow-y-auto hide-scrollbar relative">
+    <div className="flex w-full h-full bg-transparent text-white font-sans overflow-x-hidden overflow-y-auto hide-scrollbar relative">
       <div className="w-full max-w-4xl mx-auto px-4 md:px-8 py-6 md:py-10 pb-32">
         <AnimatePresence mode="wait">
           {activeTab === 'root' && (
@@ -61,8 +91,15 @@ export default function SettingsTab() {
               exit={{ x: -200, opacity: 0 }}
               transition={{ duration: 0.3, ease: [0.25, 1, 0.5, 1] }}
             >
-              <div className="mb-8">
+              <div className="mb-8 flex items-center justify-between">
                 <h1 className="text-3xl font-semibold tracking-tight">Settings</h1>
+                <button 
+                   onClick={() => setUseSmokeTest(true)}
+                   className="flex justify-between items-center bg-pink-500/10 hover:bg-pink-500/20 border border-pink-500/30 text-pink-300 px-4 py-2 rounded-lg text-sm font-semibold transition-all active:scale-95"
+                >
+                   <FlaskConical size={16} className="mr-2" />
+                   Enable Algebraic INI Renderer
+                </button>
               </div>
               <div className="flex flex-col gap-2.5">
                 {renderCategoryCard('personalization', <Palette size={22} />, 'Personalization', 'Themes, UI scaling, transparency effects')}
@@ -84,7 +121,7 @@ export default function SettingsTab() {
               {renderTopBar('About')}
               <div className="space-y-6">
                 <div className="bg-white/5 border border-white/10 rounded-lg overflow-hidden shadow-sm">
-                  <div className="px-5 py-6 flex flex-col items-center justify-center border-b border-white/10 bg-[#252525] relative">
+                  <div className="px-5 py-6 flex flex-col items-center justify-center border-b border-white/10 bg-white/5 relative">
                     <div className="w-16 h-16 bg-[#012456] rounded-2xl flex items-center justify-center mb-4 shadow-inner border border-white/20">
                       <span className="font-extrabold text-pink-500 drop-shadow-sm text-4xl tracking-tighter leading-none mt-1 mr-1">&gt;_</span>
                     </div>
@@ -92,7 +129,7 @@ export default function SettingsTab() {
                     <p className="text-sm text-gray-400 mt-1">Version 0.2.0 • MIT License</p>
                     <p className="text-xs text-gray-500 mt-2">© 2026 MansfieldPlumbing. All rights reserved.</p>
                   </div>
-                  <div className="flex flex-col bg-[#1c1c1c]">
+                  <div className="flex flex-col bg-transparent">
                     <div className="px-5 py-3 border-b border-white/5 flex items-center justify-between">
                       <span className="text-sm text-gray-400">Environment</span>
                       <span className="text-sm text-white font-mono">pwsh (PowerShell)</span>
@@ -132,7 +169,7 @@ export default function SettingsTab() {
               {renderTopBar('Canvas Host')}
               <div className="space-y-6">
                 <div className="bg-white/5 border border-white/10 rounded-lg overflow-hidden shadow-sm">
-                  <div className="px-5 py-4 border-b border-white/10 bg-[#252525]">
+                  <div className="px-5 py-4 border-b border-white/10 bg-white/5">
                      <h3 className="text-sm font-semibold text-gray-200">Canvas Host Tunables</h3>
                   </div>
                   <div className="px-5 py-6 flex flex-col gap-6">
@@ -160,7 +197,7 @@ export default function SettingsTab() {
                 </div>
 
                 <div className="bg-white/5 border border-white/10 rounded-lg overflow-hidden shadow-sm">
-                  <div className="px-5 py-4 border-b border-white/10 bg-[#252525]">
+                  <div className="px-5 py-4 border-b border-white/10 bg-white/5">
                      <h3 className="text-sm font-semibold text-gray-200">Canvas Host Diagnostics</h3>
                   </div>
                   <div className="px-5 py-6">
@@ -187,7 +224,7 @@ export default function SettingsTab() {
               transition={{ duration: 0.3, ease: [0.25, 1, 0.5, 1] }}
             >
               {renderTopBar('Personalization')}
-              <div className="bg-[#1E1E1E] rounded-lg overflow-hidden border border-white/10 shadow-sm shadow-black/20">
+              <div className="bg-transparent rounded-lg overflow-hidden border border-white/10 shadow-sm shadow-black/20">
                 <NativeColorSchemeEditor tab={{ id: 'dummy', type: 'settings', title: 'dummy' }} />
               </div>
             </motion.div>

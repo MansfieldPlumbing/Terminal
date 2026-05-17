@@ -10,10 +10,10 @@ export default function TerminalCanvas({ tab }: { tab: Tab }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const currentBounds = useRef({ cols: 120, rows: 40 });
-    const [offline, setOffline] = React.useState(false);
-  const [offlineStatus, setOfflineStatus] = React.useState('ERR_CONNECTION_REFUSED');
-  const [reconnectAttempts, setReconnectAttempts] = React.useState(0);
+  const [offline, setOffline] = React.useState(false);
   const addTab = useAppStore(state => state.addTab);
+  const showInputBar = useAppStore(state => state.showInputBar);
+  
   const CELL_W = 9;
   const CELL_H = 18;
   const FONT_SIZE = 14;
@@ -31,17 +31,12 @@ export default function TerminalCanvas({ tab }: { tab: Tab }) {
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
 
-    // Set focus to the container instantly so it accepts keystrokes
     container.focus();
 
     const resizeObserver = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect;
       const newCols = Math.max(1, Math.floor(width / CELL_W));
       const newRows = Math.max(1, Math.floor(height / CELL_H));
-      const dpr = window.devicePixelRatio || 1;
-
-      canvas.width = Math.floor(width * dpr);
-      canvas.height = Math.floor(height * dpr);
 
       if (currentBounds.current.cols !== newCols || currentBounds.current.rows !== newRows) {
         currentBounds.current = { cols: newCols, rows: newRows };
@@ -59,23 +54,24 @@ export default function TerminalCanvas({ tab }: { tab: Tab }) {
       
       const activeCols = grid[0];
       const activeRows = grid[1];
+      const dpr = window.devicePixelRatio || 1;
 
-      const cw = canvas.width / (window.devicePixelRatio || 1);
-      const ch = canvas.height / (window.devicePixelRatio || 1);
+      const exactWidth = activeCols * CELL_W;
+      const exactHeight = activeRows * CELL_H;
+      canvas.style.width = `${exactWidth}px`;
+      canvas.style.height = `${exactHeight}px`;
+      canvas.width = Math.floor(exactWidth * dpr);
+      canvas.height = Math.floor(exactHeight * dpr);
 
       ctx.save();
-      ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
-      ctx.scale(cw / (activeCols * CELL_W), ch / (activeRows * CELL_H));
-
+      ctx.scale(dpr, dpr);
       ctx.fillStyle = PALETTE[0];
-      ctx.fillRect(0, 0, activeCols * CELL_W, activeRows * CELL_H);
+      ctx.fillRect(0, 0, exactWidth, exactHeight);
       ctx.font = `bold ${FONT_SIZE}px "Cascadia Code", Consolas, monospace`;
       ctx.textBaseline = 'top';
 
       for (let i = 0; i < activeCols * activeRows; i++) {
-        // Bounds check
         if (i + 2 >= grid.length) break;
-        
         const cell = grid[i + 2];
         if (cell === 0) continue;
 
@@ -97,93 +93,52 @@ export default function TerminalCanvas({ tab }: { tab: Tab }) {
       ctx.restore();
     };
 
-    let isLocalDev = false;
-    if (typeof window !== 'undefined' && !(window as any).AndroidBridge) {
-       isLocalDev = true;
-       setOffline(true);
-    }
-
-    const handleMessage = (e: MessageEvent) => {
-      setOffline((prev) => {
-        if (prev) return false;
-        return prev;
-      });
-      onMessage(e);
-    };
-
+    const handleMessage = (e: MessageEvent) => { setOffline(false); onMessage(e); };
     window.addEventListener('message', handleMessage);
-    return () => { 
-      window.removeEventListener('message', handleMessage); 
-      resizeObserver.disconnect(); 
-    };
+    return () => { window.removeEventListener('message', handleMessage); resizeObserver.disconnect(); };
   }, []);
 
   const handleTouch = (action: string) => (e: React.PointerEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const c = currentBounds.current.cols;
-    const r = currentBounds.current.rows;
-    const col = Math.floor((e.clientX - rect.left) / (rect.width / c));
-    const row = Math.floor((e.clientY - rect.top) / (rect.height / r));
-
-    if (col >= 0 && col < c && row >= 0 && row < r) {
-      if (typeof window !== 'undefined' && (window as any).AndroidBridge?.sendInput) {
-        (window as any).AndroidBridge.sendInput(JSON.stringify({ type: 'touch', action, col, row }));
-      }
+    const col = Math.floor((e.clientX - rect.left) / CELL_W);
+    const row = Math.floor((e.clientY - rect.top) / CELL_H);
+    
+    // BUG FIX: Only intercept actual taps. Ignore scrolling/dragging!
+    if (action === 'tap' && typeof window !== 'undefined' && (window as any).AndroidBridge?.sendInput) {
+      (window as any).AndroidBridge.sendInput(JSON.stringify({ type: 'touch', action: 'tap', col, row }));
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    e.preventDefault();
-    if (typeof window !== 'undefined' && (window as any).AndroidBridge?.sendInput) {
-        (window as any).AndroidBridge.sendInput(JSON.stringify({ type: 'input', key: e.key }));
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const val = e.currentTarget.value;
+      if (typeof window !== 'undefined' && (window as any).AndroidBridge?.invokeCommand) {
+          (window as any).AndroidBridge.invokeCommand(val);
+      }
+      e.currentTarget.value = '';
     }
   };
 
   return (
-    <div
-      ref={containerRef}
-      tabIndex={0}
-      onKeyDown={handleKeyDown}
-      className="absolute inset-0 bg-[#000000] overflow-hidden outline-none"
-    >
-      <canvas ref={canvasRef} className="w-full h-full touch-none"
-        onPointerDown={handleTouch('down')} onPointerUp={handleTouch('up')} onPointerMove={handleTouch('move')}
-      />
-      {offline && (
-        <div className="absolute inset-0 z-50 bg-[#252525] flex flex-col justify-center px-12 md:px-24 select-text">
-          <div className="text-[120px] leading-none font-light text-blue-400 mb-8 tracking-tighter">
-            :(
-          </div>
-          <div className="text-xl md:text-2xl text-white font-medium max-w-2xl leading-relaxed">
-            Backend appears to be offline.
-            <div className="text-sm font-mono text-gray-400 mt-2 mb-2">
-               HTTP/1.1 503 Service Unavailable
-               <br/>
-               ErrorCode: {offlineStatus}
-               {reconnectAttempts > 0 && <span className="ml-4 text-blue-400">Reconnect attempt {reconnectAttempts}/3...</span>}
-            </div>
-            <br className="mb-4" />
-            <div className="flex gap-4">
-              <a href="#" onClick={(e) => { 
-                e.preventDefault(); 
-                if (reconnectAttempts < 3) {
-                   setOfflineStatus('WSAECONNREFUSED (10061)');
-                   setReconnectAttempts(prev => prev + 1);
-                   setTimeout(() => {
-                      if (reconnectAttempts >= 2) {
-                         setOfflineStatus('ERR_HOST_UNREACHABLE');
-                      }
-                   }, 1000);
-                } 
-              }} className="mt-4 inline-block text-blue-400 hover:text-blue-300 underline font-medium">
-                Try again
-              </a>
-              <a href="#" onClick={(e) => { e.preventDefault(); addTab({ id: 'debug-'+Date.now(), type: 'debug', title: 'Debug Session' }); }} className="mt-4 inline-block text-gray-400 hover:text-gray-300 underline font-medium">
-                Open Debug Menu
-              </a>
-            </div>
-          </div>
+    <div className="absolute inset-0 bg-[#000000] overflow-hidden flex flex-col font-mono">
+      <div ref={containerRef} className="flex-1 w-full relative outline-none p-2 flex items-start justify-start overflow-hidden" tabIndex={0}>
+        <canvas ref={canvasRef} onClick={handleTouch('tap')} />
+      </div>
+      
+      {showInputBar && (
+        <div className="h-12 bg-[#121212] border-t border-[#333] flex items-center px-4 shrink-0 z-40 relative">
+           <span className="text-pink-500 font-bold mr-2 text-sm select-none">&gt;_</span>
+           <input 
+             type="text" 
+             className="flex-1 bg-transparent border-none outline-none text-gray-200 font-mono text-sm h-full"
+             placeholder="Send command to Canvas Host..."
+             onKeyDown={handleKeyDown}
+             autoComplete="off"
+             autoCapitalize="off"
+             spellCheck="false"
+           />
         </div>
       )}
     </div>

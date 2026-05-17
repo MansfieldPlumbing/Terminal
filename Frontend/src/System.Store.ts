@@ -7,7 +7,7 @@ export interface SystemNotification {
   timestamp: number;
 }
 
-export type TabType = 'terminal' | 'applet' | 'notepad' | 'explorer' | 'colors' | 'settings' | 'debug';
+export type TabType = 'terminal' | 'xterm' | 'applet' | 'notepad' | 'explorer' | 'colors' | 'settings' | 'debug' | 'smoke_test';
 
 export interface Tab {
   id: string;
@@ -69,6 +69,12 @@ interface AppState {
   autoHideTabs: boolean;
   setAutoHideTabs: (autoHide: boolean) => void;
 
+  showInputBar: boolean;
+  setShowInputBar: (show: boolean) => void;
+
+  bgOpacity: number;
+  setBgOpacity: (opacity: number) => void;
+
   micaOpacity: number;
   setMicaOpacity: (opacity: number) => void;
   micaBlur: number;
@@ -90,8 +96,8 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set) => ({
-  tabs: [{ id: 'pwsh-1', type: 'terminal', title: 'pwsh' }],
-  activeTabId: 'pwsh-1',
+  tabs: [],
+  activeTabId: null,
   addTab: (tab) => set((state) => {
     if (tab.type === 'settings') {
       const existingSettingsTab = state.tabs.find(t => t.type === 'settings');
@@ -107,7 +113,7 @@ export const useAppStore = create<AppState>((set) => ({
   appConfig: null,
   fetchAppConfig: async () => {
     try {
-      const res = await fetch('/config.json');
+      const res = await fetch('./config.json');
       if (res.ok) {
         const data = await res.json();
         set({ appConfig: data });
@@ -187,15 +193,20 @@ export const useAppStore = create<AppState>((set) => ({
 
   autoHideTabs: true,
   setAutoHideTabs: (autoHide) => set({ autoHideTabs: autoHide }),
+  showInputBar: true,
+  setShowInputBar: (show) => set({ showInputBar: show }),
 
-  micaOpacity: 0.25,
+  bgOpacity: 0.5,
+  setBgOpacity: (opacity) => set({ bgOpacity: opacity }),
+
+  micaOpacity: 0.5,
   setMicaOpacity: (opacity) => set({ micaOpacity: opacity }),
-  micaBlur: 8,
+  micaBlur: 6,
   setMicaBlur: (blur) => set({ micaBlur: blur }),
   micaBaseColor: { r: 20, g: 36, b: 75 },
   setMicaBaseColor: (color) => set({ micaBaseColor: color }),
 
-  uiScale: 0.75,
+  uiScale: 1.0,
   setUiScale: (scale) => set({ uiScale: scale }),
 
   canvasDpi: 1,

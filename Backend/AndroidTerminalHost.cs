@@ -39,7 +39,7 @@ public class AndroidTerminalUserInterface : PSHostUserInterface {
 
     public AndroidTerminalUserInterface(MainActivity m) { 
         _main = m; 
-        _rawUi = new AndroidTerminalRawUserInterface();
+        _rawUi = new AndroidTerminalRawUserInterface(m);
     }
 
     public override PSHostRawUserInterface RawUI => _rawUi;
@@ -50,7 +50,6 @@ public class AndroidTerminalUserInterface : PSHostUserInterface {
         }
     }
 
-    // Newly required abstracts
     public override void Write(ConsoleColor foregroundColor, ConsoleColor backgroundColor, string value) => Write(value);
 
     public override void WriteLine(string value) => Write(value + "\r\n");
@@ -61,10 +60,27 @@ public class AndroidTerminalUserInterface : PSHostUserInterface {
     public override void WriteVerboseLine(string message) => WriteLine("\x1b[36mVERBOSE: " + message + "\x1b[0m");
     public override void WriteWarningLine(string message) => WriteLine("\x1b[33mWARNING: " + message + "\x1b[0m");
 
-    public override string ReadLine() => "";
+    public override string ReadLine() 
+    {
+        var sb = new StringBuilder();
+        while(true) 
+        {
+            var keyInfo = ((AndroidTerminalRawUserInterface)RawUI).ReadKey(ReadKeyOptions.IncludeKeyDown);
+            if(keyInfo.Character == '\r' || keyInfo.Character == '\n') {
+                WriteLine(""); 
+                return sb.ToString(); 
+            }
+            if(keyInfo.Character == '\b') {
+                if(sb.Length > 0) { sb.Length--; Write("\b \b"); }
+            } 
+            else if(keyInfo.Character != '\0') {
+                sb.Append(keyInfo.Character);
+                Write(keyInfo.Character.ToString());
+            }
+        }
+    }
     public override System.Security.SecureString ReadLineAsSecureString() => new System.Security.SecureString();
 
-    // Newly required prompt abstracts (No-ops for now, but C# requires them)
     public override Dictionary<string, PSObject> Prompt(string caption, string message, Collection<FieldDescription> descriptions) => new Dictionary<string, PSObject>();
     public override int PromptForChoice(string caption, string message, Collection<ChoiceDescription> choices, int defaultChoice) => defaultChoice;
     public override PSCredential PromptForCredential(string caption, string message, string userName, string targetName) => null!;
@@ -72,19 +88,21 @@ public class AndroidTerminalUserInterface : PSHostUserInterface {
 }
 
 public class AndroidTerminalRawUserInterface : PSHostRawUserInterface {
+    private readonly MainActivity _main;
     public BlockingCollection<KeyInfo> InputQueue { get; } = new BlockingCollection<KeyInfo>();
+    
+    public AndroidTerminalRawUserInterface(MainActivity m) { _main = m; }
 
     public override ConsoleColor BackgroundColor { get => ConsoleColor.Black; set {} }
     public override ConsoleColor ForegroundColor { get => ConsoleColor.White; set {} }
     
-    public override Coordinates CursorPosition { get => new Coordinates(0,0); set {} }
+    public override Coordinates CursorPosition { get => _main.GetCursorPosition(); set {} }
     public override Coordinates WindowPosition { get => new Coordinates(0,0); set {} }
     public override int CursorSize { get => 25; set {} }
     
-    // PS 7+ enforce Size instead of Coordinates for Windows boundaries
-    public override Size WindowSize { get => new Size(120, 40); set {} }
-    public override Size MaxWindowSize => new Size(120, 40);
-    public override Size MaxPhysicalWindowSize => new Size(120, 40);
+    public override Size WindowSize { get => _main.GetWindowSize(); set {} }
+    public override Size MaxWindowSize => _main.GetWindowSize();
+    public override Size MaxPhysicalWindowSize => _main.GetWindowSize();
     public override string WindowTitle { get => "Android Terminal"; set {} }
     
     public override bool KeyAvailable => InputQueue.Count > 0;
@@ -103,4 +121,3 @@ public class AndroidTerminalRawUserInterface : PSHostRawUserInterface {
     public override BufferCell[,] GetBufferContents(Rectangle rectangle) => new BufferCell[0,0];
     public override void ScrollBufferContents(Rectangle source, Coordinates destination, Rectangle clip, BufferCell fill) {}
 }
-

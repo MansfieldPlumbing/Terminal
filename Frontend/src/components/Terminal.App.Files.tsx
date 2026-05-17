@@ -30,7 +30,7 @@ export default function TerminalFiles({ tab }: { tab: Tab }) {
   const [storageInfo, setStorageInfo] = useState({ usage: 0, quota: 0 });
   const [selectedNames, setSelectedNames] = useState<Set<string>>(new Set());
   const [pathInput, setPathInput] = useState(`/ Internal Storage / android-terminal`);
-  const [nubY, setNubY] = useState(window.innerHeight / 2);
+  const [nubY, setNubY] = useState(0);
 
   const [isCreatingFile, setIsCreatingFile] = useState(false);
   const [newFileName, setNewFileName] = useState('');
@@ -40,6 +40,10 @@ export default function TerminalFiles({ tab }: { tab: Tab }) {
   const isDraggingNub = useRef(false);
   const longPressTimer = useRef<any>(null);
   const wasLongPress = useRef(false);
+  // Defer window.innerHeight read until after layout to get correct viewport size
+  React.useLayoutEffect(() => {
+    setNubY(window.innerHeight / 2);
+  }, []);
 
   useEffect(() => {
     if (isCreatingFile && newFileInputRef.current) {
@@ -54,7 +58,7 @@ export default function TerminalFiles({ tab }: { tab: Tab }) {
   useEffect(() => {
     if (navigator.storage && navigator.storage.estimate) {
       navigator.storage.estimate().then(({ usage, quota }) => {
-        setStorageInfo({ usage: usage || 0, quota: quota || 0 });
+        setStorageInfo({ usage: usage ?? 0, quota: quota ?? 0 });
       });
     }
   }, []);

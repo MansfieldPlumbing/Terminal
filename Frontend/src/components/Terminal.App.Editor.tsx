@@ -1,6 +1,9 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { useAppStore, Tab } from '../System.Store';
-import Editor, { useMonaco } from '@monaco-editor/react';
+import Editor, { useMonaco, loader } from '@monaco-editor/react';
+import * as monaco from 'monaco-editor';
+
+loader.config({ monaco });
 
 export default function TerminalEditor({ tab }: { tab: Tab }) {
   const { updateTabContent, updateTabTitle } = useAppStore();

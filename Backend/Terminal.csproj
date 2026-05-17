@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <RuntimeIdentifiers>android-arm64</RuntimeIdentifiers>
     <TargetFramework>net11.0-android</TargetFramework>
-    <SupportedOSPlatformVersion>36.1</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion>34.0</SupportedOSPlatformVersion>
     <OutputType>Exe</OutputType>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -36,12 +37,14 @@
     <AndroidAsset Include="PSHelp\**\*.*" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="VtNetCore" Version="*" />
+    <PackageReference Include="VtNetCore" Version="1.0.30" />
   </ItemGroup>
   <ItemGroup>
     <AndroidAsset Include="Assets\**\*" />
   </ItemGroup>
 </Project>
+
+
 
 
 
