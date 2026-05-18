@@ -38,6 +38,11 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="VtNetCore" Version="1.0.30" />
+    <!-- WebMessageCompat: binary ArrayBuffer IPC without base64 encoding -->
+    <PackageReference Include="Xamarin.AndroidX.WebKit" Version="1.12.1" />
+    <!-- Embedded SSH server for remote PowerShell access over LAN -->
+    <PackageReference Include="Microsoft.DevTunnels.Ssh" Version="3.12.29" />
+    <PackageReference Include="Microsoft.DevTunnels.Ssh.Tcp" Version="3.12.29" />
   </ItemGroup>
   <ItemGroup>
     <AndroidAsset Include="Assets\**\*" />

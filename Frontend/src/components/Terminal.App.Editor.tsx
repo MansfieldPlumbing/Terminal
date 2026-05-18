@@ -1,11 +1,64 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { makeStyles } from '@fluentui/react-components';
 import { useAppStore, Tab } from '../System.Store';
 import Editor, { useMonaco, loader } from '@monaco-editor/react';
 import * as monaco from 'monaco-editor';
 
 loader.config({ monaco });
 
+const useStyles = makeStyles({
+  root: {
+    width: '100%',
+    height: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    backgroundColor: '#1e1e1e',
+    color: '#D4D4D4',
+    fontFamily: 'monospace',
+    fontSize: '14px',
+  },
+  rootMinimap: {
+    // applied additionally when minimap is enabled (Monaco handles the class internally)
+  },
+  editorArea: {
+    flex: 1,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  statusBar: {
+    height: '24px',
+    backgroundColor: '#007ACC',
+    color: '#ffffff',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingLeft: '12px',
+    paddingRight: '12px',
+    fontSize: '11px',
+    fontFamily: 'sans-serif',
+    fontWeight: '500',
+    userSelect: 'none',
+    flexShrink: 0,
+    borderTop: '1px solid #333',
+  },
+  statusGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+  },
+  statusRight: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+    opacity: 0.9,
+  },
+  uppercase: {
+    textTransform: 'uppercase' as const,
+  },
+});
+
 export default function TerminalEditor({ tab }: { tab: Tab }) {
+  const styles = useStyles();
   const { updateTabContent, updateTabTitle } = useAppStore();
   const editorRef = useRef<any>(null);
   const [wordWrap, setWordWrap] = useState<'on' | 'off'>('off');
@@ -15,17 +68,12 @@ export default function TerminalEditor({ tab }: { tab: Tab }) {
     if (tab.language) return tab.language;
     const ext = filename.split('.').pop()?.toLowerCase();
     switch (ext) {
-      case 'js':
-      case 'jsx': return 'javascript';
-      case 'ts':
-      case 'tsx': return 'typescript';
+      case 'js': case 'jsx': return 'javascript';
+      case 'ts': case 'tsx': return 'typescript';
       case 'json': return 'json';
       case 'html': return 'html';
       case 'css': return 'css';
-      case 'cpp':
-      case 'c':
-      case 'h':
-      case 'hpp': return 'cpp';
+      case 'cpp': case 'c': case 'h': case 'hpp': return 'cpp';
       case 'py': return 'python';
       case 'ps1': return 'powershell';
       case 'sh': return 'shell';
@@ -34,7 +82,7 @@ export default function TerminalEditor({ tab }: { tab: Tab }) {
       default: return 'plaintext';
     }
   };
-  
+
   const language = getLanguage(tab.title);
 
   useEffect(() => {
@@ -46,46 +94,22 @@ export default function TerminalEditor({ tab }: { tab: Tab }) {
       switch (e.detail.action) {
         case 'open':
           try {
-            if (!(window as any).showOpenFilePicker) {
-               alert("File System Access API is not supported in this browser.");
-               return;
-            }
+            if (!(window as any).showOpenFilePicker) { alert("File System Access API is not supported."); return; }
             const [handle] = await (window as any).showOpenFilePicker();
             const file = await handle.getFile();
-            const text = await file.text();
-            updateTabContent(tab.id, text);
+            updateTabContent(tab.id, await file.text());
             updateTabTitle(tab.id, file.name);
-          } catch(e) {
-            // Cancelled
-          }
+          } catch {}
           break;
-        case 'save':
-          console.log('Save triggered for', tab.title);
-          break;
-        case 'undo':
-          editor.trigger('AppMenu', 'undo', null);
-          break;
-        case 'redo':
-          editor.trigger('AppMenu', 'redo', null);
-          break;
-        case 'cut':
-          editor.trigger('AppMenu', 'editor.action.clipboardCutAction', null);
-          break;
-        case 'copy':
-          editor.trigger('AppMenu', 'editor.action.clipboardCopyAction', null);
-          break;
-        case 'paste':
-          editor.trigger('AppMenu', 'editor.action.clipboardPasteAction', null);
-          break;
-        case 'select-all':
-          editor.setSelection(editor.getModel().getFullModelRange());
-          break;
-        case 'toggle-word-wrap':
-          setWordWrap(w => w === 'on' ? 'off' : 'on');
-          break;
-        case 'toggle-minimap':
-          setMinimap(m => !m);
-          break;
+        case 'save': console.log('Save triggered for', tab.title); break;
+        case 'undo': editor.trigger('AppMenu', 'undo', null); break;
+        case 'redo': editor.trigger('AppMenu', 'redo', null); break;
+        case 'cut': editor.trigger('AppMenu', 'editor.action.clipboardCutAction', null); break;
+        case 'copy': editor.trigger('AppMenu', 'editor.action.clipboardCopyAction', null); break;
+        case 'paste': editor.trigger('AppMenu', 'editor.action.clipboardPasteAction', null); break;
+        case 'select-all': editor.setSelection(editor.getModel().getFullModelRange()); break;
+        case 'toggle-word-wrap': setWordWrap(w => w === 'on' ? 'off' : 'on'); break;
+        case 'toggle-minimap': setMinimap(m => !m); break;
       }
       editor.focus();
     };
@@ -99,13 +123,13 @@ export default function TerminalEditor({ tab }: { tab: Tab }) {
       base: 'vs-dark',
       inherit: true,
       rules: [
-        { token: 'comment', foreground: '4ade80', fontStyle: 'italic' }, // Green 400
-        { token: 'keyword', foreground: 'f472b6', fontStyle: 'bold' }, // Pink 400
-        { token: 'string', foreground: 'facc15' }, // Yellow 400
-        { token: 'number', foreground: '818cf8' }, // Indigo 400
-        { token: 'type', foreground: '38bdf8' }, // Sky 400
-        { token: 'class', foreground: '2dd4bf', fontStyle: 'bold' }, // Teal 400
-        { token: 'function', foreground: 'a78bfa' }, // Violet 400
+        { token: 'comment', foreground: '4ade80', fontStyle: 'italic' },
+        { token: 'keyword', foreground: 'f472b6', fontStyle: 'bold' },
+        { token: 'string', foreground: 'facc15' },
+        { token: 'number', foreground: '818cf8' },
+        { token: 'type', foreground: '38bdf8' },
+        { token: 'class', foreground: '2dd4bf', fontStyle: 'bold' },
+        { token: 'function', foreground: 'a78bfa' },
         { token: 'identifier', foreground: 'e2e8f0' },
       ],
       colors: {
@@ -123,17 +147,9 @@ export default function TerminalEditor({ tab }: { tab: Tab }) {
     });
   }
 
-  function handleEditorDidMount(editor: any, monaco: any) {
-    editorRef.current = editor;
-  }
-
-  function handleEditorChange(value: string | undefined, event: any) {
-    updateTabContent(tab.id, value || '');
-  }
-  
   return (
-    <div className={`w-full h-full flex flex-col bg-[#1e1e1e] text-[#D4D4D4] font-mono text-[14px] ${minimap ? "monaco-mica-minimap" : ""}`}>
-      <div className="flex-1 relative overflow-hidden">
+    <div className={`${styles.root}${minimap ? ' monaco-mica-minimap' : ''}`}>
+      <div className={styles.editorArea}>
         <Editor
           width="100%"
           height="100%"
@@ -141,8 +157,8 @@ export default function TerminalEditor({ tab }: { tab: Tab }) {
           language={language}
           theme="vibrant-dark"
           value={tab.content ?? ''}
-          onChange={handleEditorChange}
-          onMount={handleEditorDidMount}
+          onChange={(value) => updateTabContent(tab.id, value || '')}
+          onMount={(editor) => { editorRef.current = editor; }}
           beforeMount={handleEditorWillMount}
           options={{
             minimap: { enabled: minimap, side: 'right' },
@@ -164,12 +180,12 @@ export default function TerminalEditor({ tab }: { tab: Tab }) {
           }}
         />
       </div>
-      <div className="h-6 bg-[#007ACC] text-white flex items-center justify-between px-3 text-[11px] font-sans font-medium select-none shrink-0 border-t border-[#333]">
-        <div className="flex items-center gap-4">
+      <div className={styles.statusBar}>
+        <div className={styles.statusGroup}>
           <span>Ready</span>
         </div>
-        <div className="flex items-center gap-4 opacity-90">
-          <span className="uppercase">{language}</span>
+        <div className={styles.statusRight}>
+          <span className={styles.uppercase}>{language}</span>
           <span>UTF-8</span>
         </div>
       </div>

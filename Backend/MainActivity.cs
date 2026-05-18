@@ -3,6 +3,7 @@ using Android.OS;
 using Android.Views;
 using Android.Webkit;
 using Android.Window;
+using AndroidX.WebKit;
 using Java.Interop;
 using System;
 using System.Text;
@@ -73,6 +74,8 @@ public class MainActivity : Activity
         _webView.Settings.BuiltInZoomControls = false;
         _webView.Settings.DisplayZoomControls = false;
         _webView.Settings.SetSupportZoom(false);
+        _webView.Settings.UseWideViewPort = true;
+        _webView.Settings.LoadWithOverviewMode = true;
         _webView.OverScrollMode = OverScrollMode.Never;
         _webView.SetWebViewClient(new LockedDownWebViewClient()); 
         _webView.SetWebChromeClient(new QuietWebChromeClient());
@@ -101,7 +104,15 @@ public class MainActivity : Activity
 
         SetContentView(_webView);
 
-
+        // Request full external storage access (MANAGE_EXTERNAL_STORAGE) so
+        // $PHONE_HOME (/storage/emulated/0) is accessible without permission errors.
+        if (!Android.OS.Environment.IsExternalStorageManager)
+        {
+            var intent = new Android.Content.Intent(
+                Android.Provider.Settings.ActionManageAppAllFilesAccessPermission,
+                Android.Net.Uri.Parse("package:" + PackageName));
+            StartActivity(intent);
+        }
 
         Task.Run(() => InitializePowerShell());
     }
@@ -141,16 +152,38 @@ public class MainActivity : Activity
         LoadFromAssembly(iss, Assembly.Load("Microsoft.PowerShell.Commands.Utility"));
         LoadFromAssembly(iss, Assembly.Load("Microsoft.PowerShell.Commands.Management"));
 
-        // --- RESTORE CORE ALIASES ---
-        iss.Commands.Add(new SessionStateAliasEntry("cd", "Set-Location", ""));
-        iss.Commands.Add(new SessionStateAliasEntry("ls", "Get-ChildItem", ""));
-        iss.Commands.Add(new SessionStateAliasEntry("dir", "Get-ChildItem", ""));
-        iss.Commands.Add(new SessionStateAliasEntry("cat", "Get-Content", ""));
-        iss.Commands.Add(new SessionStateAliasEntry("echo", "Write-Output", ""));
-        iss.Commands.Add(new SessionStateAliasEntry("clear", "Clear-Host", ""));
-        iss.Commands.Add(new SessionStateAliasEntry("rm", "Remove-Item", ""));
-        iss.Commands.Add(new SessionStateAliasEntry("pwd", "Get-Location", ""));
-        iss.Commands.Add(new SessionStateAliasEntry("sl", "Set-Location", ""));
+        // --- CORE ALIASES ---
+        iss.Commands.Add(new SessionStateAliasEntry("cd",      "Set-Location",      ""));
+        iss.Commands.Add(new SessionStateAliasEntry("ls",      "Get-ChildItem",     ""));
+        iss.Commands.Add(new SessionStateAliasEntry("dir",     "Get-ChildItem",     ""));
+        iss.Commands.Add(new SessionStateAliasEntry("cat",     "Get-Content",       ""));
+        iss.Commands.Add(new SessionStateAliasEntry("echo",    "Write-Output",      ""));
+        iss.Commands.Add(new SessionStateAliasEntry("clear",   "Clear-Host",        ""));
+        iss.Commands.Add(new SessionStateAliasEntry("rm",      "Remove-Item",       ""));
+        iss.Commands.Add(new SessionStateAliasEntry("pwd",     "Get-Location",      ""));
+        iss.Commands.Add(new SessionStateAliasEntry("sl",      "Set-Location",      ""));
+        iss.Commands.Add(new SessionStateAliasEntry("cls",     "Clear-Host",        ""));
+        iss.Commands.Add(new SessionStateAliasEntry("cp",      "Copy-Item",         ""));
+        iss.Commands.Add(new SessionStateAliasEntry("mv",      "Move-Item",         ""));
+        iss.Commands.Add(new SessionStateAliasEntry("del",     "Remove-Item",       ""));
+        iss.Commands.Add(new SessionStateAliasEntry("rd",      "Remove-Item",       ""));
+        iss.Commands.Add(new SessionStateAliasEntry("ren",     "Rename-Item",       ""));
+        iss.Commands.Add(new SessionStateAliasEntry("copy",    "Copy-Item",         ""));
+        iss.Commands.Add(new SessionStateAliasEntry("move",    "Move-Item",         ""));
+        iss.Commands.Add(new SessionStateAliasEntry("chdir",   "Set-Location",      ""));
+        iss.Commands.Add(new SessionStateAliasEntry("type",    "Get-Content",       ""));
+        iss.Commands.Add(new SessionStateAliasEntry("h",       "Get-History",       ""));
+        iss.Commands.Add(new SessionStateAliasEntry("history", "Get-History",       ""));
+        iss.Commands.Add(new SessionStateAliasEntry("man",     "Get-Help",          ""));
+        iss.Commands.Add(new SessionStateAliasEntry("help",    "Get-Help",          ""));
+        iss.Commands.Add(new SessionStateAliasEntry("ps",      "Get-Process",       ""));
+        iss.Commands.Add(new SessionStateAliasEntry("kill",    "Stop-Process",      ""));
+        iss.Commands.Add(new SessionStateAliasEntry("grep",    "Select-String",     ""));
+        iss.Commands.Add(new SessionStateAliasEntry("which",   "Get-Command",       ""));
+        iss.Commands.Add(new SessionStateAliasEntry("curl",    "Invoke-WebRequest", ""));
+        iss.Commands.Add(new SessionStateAliasEntry("wget",    "Invoke-WebRequest", ""));
+        iss.Commands.Add(new SessionStateAliasEntry("sort",    "Sort-Object",       ""));
+        iss.Commands.Add(new SessionStateAliasEntry("tee",     "Tee-Object",        ""));
         // ----------------------------
         
         _host = new AndroidTerminalHost(this);
@@ -163,13 +196,34 @@ public class MainActivity : Activity
         // Map Android's sandboxed storage to the user's HOME directory
         string appBasePath = this.FilesDir!.AbsolutePath;
         System.Environment.SetEnvironmentVariable("HOME", appBasePath);
-        
-        _ps.AddScript($"$env:HOME = '{appBasePath}'; Set-Location -Path '{appBasePath}'");
+        System.Environment.SetEnvironmentVariable("PHONE_HOME", "/storage/emulated/0");
+
+        _ps.AddScript($"$env:HOME = '{appBasePath}'; $env:PHONE_HOME = '/storage/emulated/0'; Set-Location -Path '{appBasePath}'");
+        _ps.Invoke();
+        _ps.Commands.Clear();
+
+        // Seed profile.ps1 from assets on first run, then source it
+        string profilePath = System.IO.Path.Combine(appBasePath, "profile.ps1");
+        if (!System.IO.File.Exists(profilePath))
+        {
+            try
+            {
+                using var assetStream = this.Assets!.Open("wwwroot/home/profile.ps1");
+                using var dest = System.IO.File.Create(profilePath);
+                assetStream.CopyTo(dest);
+            }
+            catch { }
+        }
+        _ps.AddScript($"if (Test-Path '{profilePath}') {{ . '{profilePath}' }}");
         _ps.Invoke();
         _ps.Commands.Clear();
 
         var repl = new ReplEngine(this, _host, rs);
         repl.Start();
+
+        // Start SSH daemon for remote PowerShell access on LAN
+        var ssh = new PowerShellSshDaemon(this);
+        Task.Run(() => ssh.StartAsync());
     }
 
     public void ExecuteCommand(string command) 
@@ -221,6 +275,53 @@ public class MainActivity : Activity
             // NATIVE STRING IPC: Bypasses string evaluation limits
             _webView.PostWebMessage(new WebMessage(text), Android.Net.Uri.Parse("*")!);
         });
+    }
+
+    public void RouteRawInput(string payload)
+    {
+        if (string.IsNullOrEmpty(payload)) return;
+        try
+        {
+            var rawUi = (AndroidTerminalRawUserInterface)_host.UI.RawUI;
+            for (int i = 0; i < payload.Length; i++)
+            {
+                char ch = payload[i];
+                ConsoleKey key = (ConsoleKey)0;
+
+                // VT100 arrow sequences: ESC [ A/B/C/D
+                if (ch == '\x1b' && i + 2 < payload.Length && payload[i + 1] == '[')
+                {
+                    switch (payload[i + 2])
+                    {
+                        case 'A': key = ConsoleKey.UpArrow;    break;
+                        case 'B': key = ConsoleKey.DownArrow;  break;
+                        case 'C': key = ConsoleKey.RightArrow; break;
+                        case 'D': key = ConsoleKey.LeftArrow;  break;
+                    }
+                    if (key != (ConsoleKey)0)
+                    {
+                        rawUi.InputQueue.Add(new KeyInfo((int)key, '\0', (ControlKeyStates)0, true));
+                        i += 2;
+                        continue;
+                    }
+                }
+
+                if      (ch == '\r' || ch == '\n') key = ConsoleKey.Enter;
+                else if (ch == '\b' || ch == '\x7F') key = ConsoleKey.Backspace;
+                else if (ch == '\t')  key = ConsoleKey.Tab;
+                else if (ch == '\x1b') key = ConsoleKey.Escape;
+
+                char keyChar = key switch {
+                    ConsoleKey.Enter     => '\r',
+                    ConsoleKey.Backspace => '\b',
+                    ConsoleKey.Tab       => '\t',
+                    ConsoleKey.Escape    => '\x1b',
+                    _                    => ch
+                };
+                rawUi.InputQueue.Add(new KeyInfo((int)key, keyChar, (ControlKeyStates)0, true));
+            }
+        }
+        catch { }
     }
 
     public void RouteInputEvent(string jsonPayload)
@@ -315,9 +416,22 @@ public class MainActivity : Activity
         Buffer.BlockCopy(frameBuffer, 0, bytes, 0, bytes.Length);
 
         RunOnUiThread(() => {
-            // ZERO-COPY IPC: Native Dalvik byte[] to V8 ArrayBuffer
-            string b64 = Convert.ToBase64String(bytes);
-            _webView.EvaluateJavascript("var b=atob('" + b64 + "');var a=new Uint8Array(b.length);for(var i=0;i<b.length;i++)a[i]=b.charCodeAt(i);window.postMessage(a.buffer, '*');", null);
+            if (WebViewFeature.IsFeatureSupported(WebViewFeature.WebMessageArrayBuffer))
+            {
+                // Primary: binary ArrayBuffer IPC — no string allocation, no base64
+                WebViewCompat.PostWebMessage(
+                    _webView,
+                    new WebMessageCompat(bytes),
+                    Android.Net.Uri.Parse("*")!);
+            }
+            else
+            {
+                // ALT_FALLBACK: base64 eval for older system WebViews
+                string b64 = Convert.ToBase64String(bytes);
+                _webView.EvaluateJavascript(
+                    "var b=atob('" + b64 + "');var a=new Uint8Array(b.length);for(var i=0;i<b.length;i++)a[i]=b.charCodeAt(i);window.postMessage(a.buffer,'*');",
+                    null);
+            }
         });
     }
             public void NotifyReactReady() { 
@@ -335,6 +449,10 @@ public class PwshBridge : Java.Lang.Object
     [Export("invokeCommand")]
     [JavascriptInterface]
     public void InvokeCommand(string command) { _activity.ExecuteCommand(command); }
+
+    [Export("sendRawInput")]
+    [JavascriptInterface]
+    public void SendRawInput(string payload) { _activity.RouteRawInput(payload); }
 
     [Export("sendInput")]
     [JavascriptInterface]
@@ -356,8 +474,7 @@ public class TerminalBackCallback : Java.Lang.Object, IOnBackInvokedCallback
 
     public void OnBackInvoked()
     {
-        // Intercept Android Back Swipe: Send ESC instead of closing the app
-        string json = "{ \"type\": \"input\", \"key\": \"Escape\" }";
-        _activity.RouteInputEvent(json);
+        // Intercept Android Back Swipe: inject ESC directly into PSHostRawUserInterface
+        _activity.RouteRawInput("\x1b");
     }
 }

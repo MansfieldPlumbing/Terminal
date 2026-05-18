@@ -34,9 +34,18 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
-// Listen for Native Android WebMessages (ArrayBuffers for Canvas, Strings for Xterm)
+// Listen for Native Android WebMessages
+// ArrayBuffer  → binary canvas frame from WebMessageCompat (Phase 3)
+// string       → raw ANSI stream for xterm.js via PostWebMessage
 window.addEventListener('message', (e) => {
-    if (typeof e.data === 'string') {
+    if (e.data instanceof ArrayBuffer) {
+        const dispatch = (window as any).__dispatchWriteToTerminal;
+        if (dispatch) {
+            dispatch(e.data);
+        } else {
+            (window as any).__writeToTerminalBuffer.push(e.data);
+        }
+    } else if (typeof e.data === 'string') {
         const dispatch = (window as any).__dispatchPwshOutput;
         if (dispatch) {
             dispatch(e.data);

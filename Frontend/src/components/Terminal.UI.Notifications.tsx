@@ -1,22 +1,73 @@
 import React from 'react';
+import { makeStyles } from '@fluentui/react-components';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAppStore } from '../System.Store';
 import { CheckCircle, Info, AlertTriangle, XCircle, X } from 'lucide-react';
 
+const useStyles = makeStyles({
+  root: {
+    position: 'fixed',
+    top: '16px',
+    right: '16px',
+    zIndex: 200,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    maxWidth: '384px',
+    width: '100%',
+    pointerEvents: 'none',
+  },
+  toast: {
+    borderRadius: '12px',
+    padding: '12px',
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '12px',
+    pointerEvents: 'auto',
+    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+  },
+  icon: {
+    flexShrink: 0,
+    marginTop: '2px',
+  },
+  message: {
+    flex: 1,
+    fontSize: '14px',
+    fontWeight: '500',
+    lineHeight: '1.3',
+  },
+  closeBtn: {
+    flexShrink: 0,
+    color: 'rgba(161,161,170,1)',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: '4px',
+    padding: '2px',
+    border: 'none',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ':hover': {
+      color: 'rgba(212,212,216,1)',
+    },
+  },
+});
+
 export default function Notifications() {
   const { notifications, removeNotification } = useAppStore();
+  const styles = useStyles();
 
   const getIcon = (type: string) => {
     switch (type) {
-      case 'success': return <CheckCircle className="w-4 h-4 text-emerald-400" />;
-      case 'warn': return <AlertTriangle className="w-4 h-4 text-amber-400" />;
-      case 'error': return <XCircle className="w-4 h-4 text-red-400" />;
-      default: return <Info className="w-4 h-4 text-blue-400" />;
+      case 'success': return <CheckCircle style={{ width: 16, height: 16, color: '#34d399' }} />;
+      case 'warn':    return <AlertTriangle style={{ width: 16, height: 16, color: '#fbbf24' }} />;
+      case 'error':   return <XCircle style={{ width: 16, height: 16, color: '#f87171' }} />;
+      default:        return <Info style={{ width: 16, height: 16, color: '#60a5fa' }} />;
     }
   };
 
   return (
-    <div className="fixed top-4 right-4 z-[200] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+    <div className={styles.root}>
       <AnimatePresence>
         {notifications.map((notification) => (
           <motion.div
@@ -24,17 +75,17 @@ export default function Notifications() {
             initial={{ opacity: 0, x: 20, scale: 0.95 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: 20, scale: 0.95 }}
-            className="mica-panel mica-border shadow-2xl rounded-xl p-3 flex items-start gap-3 pointer-events-auto"
+            className={`mica-panel mica-border ${styles.toast}`}
           >
-            <div className="shrink-0 mt-0.5">{getIcon(notification.type)}</div>
-            <div className="flex-1 text-sm text-shadow-mica font-medium leading-tight">
+            <div className={styles.icon}>{getIcon(notification.type)}</div>
+            <div className={`text-shadow-mica ${styles.message}`}>
               {notification.message}
             </div>
             <button
               onClick={() => removeNotification(notification.id)}
-              className="shrink-0 text-zinc-500 hover:text-zinc-300 transition-colors bg-black/20 rounded p-0.5"
+              className={styles.closeBtn}
             >
-              <X className="w-4 h-4" />
+              <X style={{ width: 16, height: 16 }} />
             </button>
           </motion.div>
         ))}

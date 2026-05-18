@@ -43,21 +43,21 @@ public class ReplEngine
         {
             try
             {
-                                // Safely get working directory without relying on prompt function
+                                // Call the profile's prompt function if defined, else fallback
                 string pText = "PS> ";
                 try {
                     ps.Commands.Clear();
                     ps.Streams.ClearStreams();
-                    ps.AddScript("$PWD.Path");
+                    ps.AddScript("if (Test-Path Function:prompt) { (prompt).TrimEnd() } else { \"PS $($PWD.Path)> \" }");
                     var pResult = ps.Invoke();
                     if (pResult != null && pResult.Count > 0 && pResult[0] != null) {
-                        pText = $"PS {pResult[0]}> ";
+                        pText = pResult[0].ToString() ?? "PS> ";
                     }
                 } catch {
                     pText = "PS> ";
                 }
                 pText = pText.Replace("\r", "").Replace("\n", "");
-                _mainActivity.FeedTerminal(Encoding.UTF8.GetBytes($"\x1b[32;1m{pText}\x1b[0m"));
+                _mainActivity.FeedTerminal(Encoding.UTF8.GetBytes($"\x1b[0m{pText}"));
                 string command = ReadLineFromRawUI();
 
                 if (string.IsNullOrWhiteSpace(command)) continue;

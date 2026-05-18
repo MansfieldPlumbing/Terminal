@@ -1,6 +1,4 @@
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { mergeClasses } from '@fluentui/react-components';
 
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+export const cn = (...args: (string | undefined | null | false)[]): string =>
+  mergeClasses(...(args.filter(Boolean) as string[]));
