@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>ANSI engine harness</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0c0c0c; }
+  #host { width: 100vw; height: 100vh; }
+</style>
+</head>
+<body>
+<div id="host"></div>
+<script type="module">
+// Standalone dev harness for the home-rolled VT engine — no Android backend, no WS. Feeds canned
+// ANSI so the parser/buffer/renderer can be inspected in a plain browser (the opt-in dev path).
+import { Terminal } from '../lib/ansi/terminal.js';
+
+const theme = {
+  background: '#0c0c0c', foreground: '#cccccc', cursor: '#ffffff',
+  black: '#0c0c0c', red: '#c50f1f', green: '#13a10e', yellow: '#c19c00',
+  blue: '#0037da', magenta: '#881798', cyan: '#3a96dd', white: '#cccccc',
+  brightBlack: '#767676', brightRed: '#e74856', brightGreen: '#16c60c', brightYellow: '#f9f1a5',
+  brightBlue: '#3b78ff', brightMagenta: '#b4009e', brightCyan: '#61d6d6', brightWhite: '#f2f2f2',
+};
+
+const term = new Terminal({ fontFamily: 'Consolas, "Cascadia Code", monospace', fontSize: 16, cursorInactiveStyle: 'bar' });
+term.open(document.getElementById('host'));
+term.setTheme(theme);
+window.term = term;
+
+const ESC = '\x1b';
+const sgr = (...n) => ESC + '[' + n.join(';') + 'm';
+let o = '';
+o += sgr(1, 32) + 'PS' + sgr(0) + ' ' + sgr(36) + 'S:\\terminal-project' + sgr(0) + '> Get-AnsiEngine\r\n';
+o += 'Home-rolled VT engine ' + sgr(1, 92) + 'ONLINE' + sgr(0) + ' — xterm deleted (276 KB gone).\r\n\r\n';
+o += sgr(90) + 'standard / bright palette\r\n' + sgr(0);
+for (let i = 0; i < 8; i++) o += sgr(30 + i) + ' ' + (i < 10 ? ' ' : '') + i + ' ' + sgr(0);
+o += '\r\n';
+for (let i = 0; i < 8; i++) o += sgr(90 + i) + ' ' + (i + 8) + ' ' + sgr(0);
+o += '\r\n\r\n';
+o += sgr(1) + 'bold' + sgr(0) + '   ' + sgr(2) + 'dim' + sgr(0) + '   ' + sgr(3) + 'italic' + sgr(0) +
+     '   ' + sgr(4) + 'underline' + sgr(0) + '   ' + sgr(7) + 'inverse' + sgr(0) + '   ' + sgr(9) + 'strike' + sgr(0) + '\r\n\r\n';
+o += sgr(90) + 'truecolor (48;2;r;g;b)\r\n' + sgr(0);
+for (let i = 0; i < 32; i++) { const r = Math.round(255 * i / 31); o += sgr(48, 2, r, 60, 140) + ' '; }
+o += sgr(0) + '\r\n\r\n' + sgr(90) + '256-color cube (48;5;n)\r\n' + sgr(0);
+for (let i = 16; i < 16 + 36; i++) o += ESC + '[48;5;' + i + 'm ';
+o += sgr(0) + '\r\n\r\n';
+o += sgr(33) + 'cursor →' + sgr(0) + ' PS> ';
+term.write(o);
+</script>
+</body>
+</html>
