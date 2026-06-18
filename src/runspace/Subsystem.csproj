@@ -15,6 +15,9 @@
     <ApplicationVersion>1</ApplicationVersion>
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
     <PublishTrimmed>false</PublishTrimmed>
+    <!-- Ship en-US only: drop the 13 satellite-localization cultures (cs/de/es/fr/it/ja/ko/pl/pt-BR/
+         ru/tr/zh-Hans/zh-Hant ~ 10.5 MB raw). Zero reflection risk (the UI is English); NOT the trimmer. -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <DebugSymbols>false</DebugSymbols>
     <DebugType>none</DebugType>
     <!-- The Windows head (runspace/windows) shares this tree but is a SEPARATE project (SubsystemWin.csproj);
