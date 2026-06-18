@@ -276,6 +276,12 @@ public class MainActivity : Activity
         // LOWER part of each edge is ours; mid/upper edge stays the OS back gesture.)
         try { if (Window?.DecorView is Android.Views.View _dv) _dv.LayoutChange += (s, e) => ApplyGestureExclusion(); } catch { }
 
+        // Edge-to-edge (SetDecorFitsSystemWindows(false)) means the IME inset is NOT auto-applied, so on
+        // API30+ the soft keyboard draws OVER the bottom of the WebView — on top of the always-visible
+        // taskbar. Pad the WebView by the IME (keyboard) inset so content shrinks above it instead.
+        if (Build.VERSION.SdkInt >= BuildVersionCodes.R)
+            try { _webView.SetOnApplyWindowInsetsListener(new ImeInsetPad()); } catch { }
+
         // Bind the HTTP/WebSocket backend (8080) at launch. This MUST be unconditional —
         // it powers terminal/messenger/agent/files/settings. Previously it only started
         // inside StartProjection() (screen-cast), so a normal launch left 8080 unbound and
@@ -294,6 +300,18 @@ public class MainActivity : Activity
         // full-bleed, no shell chrome. The component name IS the door id (manifest is the truth).
         var door = DoorFromIntent(Intent);
         if (door != null) LoadDoor(door);
+    }
+
+    // Pads the WebView by the IME (soft-keyboard) inset under edge-to-edge, so the keyboard shrinks
+    // the content above it instead of covering the always-visible taskbar (API30+).
+    private sealed class ImeInsetPad : Java.Lang.Object, Android.Views.View.IOnApplyWindowInsetsListener
+    {
+        public WindowInsets OnApplyWindowInsets(Android.Views.View v, WindowInsets insets)
+        {
+            var ime = insets.GetInsets(WindowInsets.Type.Ime());
+            v.SetPadding(v.PaddingLeft, v.PaddingTop, v.PaddingRight, ime.Bottom);
+            return insets;
+        }
     }
 
     // …door.Editor → "edit", …door.Broker → "agent", etc. Null = the main icon (the shell/hub).

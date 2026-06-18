@@ -7,7 +7,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Terminal</title>
-    <link rel="stylesheet" href="vendor/xterm/xterm.css" />
     <style>
         :root {
             /* Color/accent come from /theme.css — never re-declare them here (that's the drift bug). */
@@ -19,173 +18,145 @@
             margin: 0; padding: 0;
             background: var(--bg);
             color: var(--fg);
-            /* Fill the dynamic viewport edge-to-edge so no chrome color shows between the grid and the
-               taskbar (the white-bar bug). 100dvh tracks the live visible area as the IME/taskbar move;
-               100vh is the fallback for engines without dvh. */
+            /* 100dvh tracks the live visible area as the IME/taskbar move; 100vh is the fallback. */
             height: 100vh; height: 100dvh; width: 100%;
             overflow: hidden;
             font-family: var(--font-sans);
             display: flex; flex-direction: column;
         }
-        /* Edge-to-edge: the terminal is its own surface — its background comes from the active xterm
-           scheme, and the body matches it so no chrome color leaks around the grid. The top inset keeps
-           the first rows clear of the notch/curve; the grid still paints to the very bottom edge. */
+        /* The engine paints its own canvas edge-to-edge; the body matches the active scheme bg so no
+           chrome color leaks around the grid. The top inset keeps the first rows clear of the notch. */
         #terminal-container {
+            position: relative;
             flex: 1 1 auto; width: 100%; height: 100%;
-            padding: var(--safe-top) 0 0 0; box-sizing: border-box;
+            /* breathing room so glyphs don't jam the bezel; the engine's fit() subtracts this, so the
+               cell grid stays whole (no half-cells, no clipped last column). */
+            padding: calc(var(--safe-top) + 10px) 14px calc(var(--safe-bottom) + 10px) 14px;
+            box-sizing: border-box;
             min-height: 0;
+            touch-action: pan-y;
         }
 
-        /* The grid must own the full container height, or its own background stops short and the body
-           shows through as a strip above the taskbar (the white line). The viewport inherits the active
-           scheme's background so the fill reaches the bottom edge. */
-        .xterm { width: 100%; height: 100%; }
-        .xterm-viewport { background-color: transparent !important; }
-        .xterm-viewport::-webkit-scrollbar { width: 8px; }
-        .xterm-viewport::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-        /* The browser may pan vertically; the capture-phase handlers below own the gesture either way. */
-        .xterm-screen, .xterm-text-layer, .xterm-rows { touch-action: pan-y !important; }
+        /* The JOYSTICK — a floating glass bubble (the widget-bubble form, modelled on flickpaint's
+           thumbstick). Drag the nub to send arrows (hold to repeat); TAP the nub for Enter; drag the
+           RING to reposition. Joystick-primary input — the soft keyboard is opt-in (⌨ on the key strip). */
+        #stick {
+            position: absolute; right: calc(14px + env(safe-area-inset-right, 0px));
+            bottom: calc(16px + var(--safe-bottom)); z-index: 20;
+            width: 120px; height: 120px; border-radius: 999px; touch-action: none;
+            user-select: none; -webkit-user-select: none; opacity: .92;
+            background: rgba(127,127,127,.16);
+            backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--border);
+            box-shadow: 0 16px 40px -8px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.08);
+        }
+        #stick .axis { position: absolute; color: var(--fg); opacity: .25; font: 600 11px var(--font-mono); pointer-events: none; }
+        #stick .ax-u { top: 7px; left: 0; right: 0; text-align: center; }
+        #stick .ax-d { bottom: 7px; left: 0; right: 0; text-align: center; }
+        #stick .ax-l { left: 9px; top: 50%; transform: translateY(-50%); }
+        #stick .ax-r { right: 9px; top: 50%; transform: translateY(-50%); }
+        #nub {
+            position: absolute; inset: 0; margin: auto; width: 52px; height: 52px; border-radius: 999px;
+            background: rgba(255,255,255,.9); border: 1px solid rgba(255,255,255,.4);
+            box-shadow: 0 4px 14px rgba(0,0,0,.5), inset 0 2px 4px rgba(255,255,255,.8);
+            display: flex; align-items: center; justify-content: center; pointer-events: none;
+        }
+        #nub .core { width: 26px; height: 26px; border-radius: 999px; border: 2px solid var(--accent); }
+        /* the compact non-arrow keys, riding just above the joystick */
+        #stick-keys {
+            position: absolute; right: calc(14px + env(safe-area-inset-right, 0px));
+            bottom: calc(146px + var(--safe-bottom)); z-index: 20;
+            display: flex; gap: 5px; user-select: none; -webkit-user-select: none; touch-action: none;
+        }
+        #stick-keys button {
+            min-width: 38px; height: 34px; padding: 0 8px; border: 1px solid var(--border); border-radius: 10px;
+            background: rgba(127,127,127,.18); color: var(--fg); font: 600 12px var(--font-mono);
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        #stick-keys button:active { background: var(--accent); color: var(--accent-fg); }
+        #stick-keys.kbd-on #sk-kb { background: var(--accent); color: var(--accent-fg); }
     </style>
 </head>
 <body>
     <div id="terminal-container"></div>
+    <div id="stick-keys" aria-label="terminal keys">
+        <button id="sk-kb"  aria-label="keyboard">⌨</button>
+        <button id="sk-esc" aria-label="escape">esc</button>
+        <button id="sk-tab" aria-label="tab">tab</button>
+        <button data-seq="&#x03;">^C</button>
+        <button id="sk-clr" aria-label="clear">clr</button>
+    </div>
+    <div id="stick" aria-label="terminal joystick">
+        <span class="axis ax-u">▲</span><span class="axis ax-d">▼</span>
+        <span class="axis ax-l">◀</span><span class="axis ax-r">▶</span>
+        <div id="nub"><div class="core"></div></div>
+    </div>
 
     <script src="/shell/presenter.js"></script>
-    <script src="vendor/xterm/xterm.js"></script>
-    <script src="vendor/xterm/xterm-addon-fit.js"></script>
     <script src="/schemes.js"></script>
     <script type="module">
+        import { Terminal } from '/lib/ansi/terminal.js';   // our engine — xterm is gone
         import { WebSocketClient } from '/lib/api.js';
         import { PsrpSession } from '/lib/psrp.js';
 
-        // Parse tabId from URL, fallback to generating one
         const urlParams = new URLSearchParams(window.location.search);
         const tabId = urlParams.has('tabId') ? parseInt(urlParams.get('tabId')) : Date.now();
-
-        // --- Terminal ---
         const cssVar = (n, d) => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || d;
+
         const term = new Terminal({
-            cursorBlink: true,
-            // On focus loss xterm defaults to a hollow box ('outline') over the cell — visually loud on
-            // a phone. A thin bar is the subtle blurred-cursor cue the gripe asked for.
-            cursorInactiveStyle: 'bar',
-            // Pre-paint fallback only — schemes.js (registry-driven) repaints immediately below.
-            theme: { background: cssVar('--bg', '#000000'), foreground: cssVar('--fg', '#f2f2f2') },
             fontFamily: cssVar('--font-mono', 'monospace'),
             fontSize: 14,
             scrollback: 5000,
-            allowTransparency: true,
-            allowProposedApi: true
+            cursorInactiveStyle: 'bar',   // a thin blurred-cursor cue, not a loud hollow box
         });
-        window.fitAddon = new FitAddon.FitAddon();
-        term.loadAddon(window.fitAddon);
         term.open(document.getElementById('terminal-container'));
-        term.focus();
+        term.focus();   // focus the (inputmode=none) sink so the d-pad lands keys; no soft keyboard
 
-        // Apply the active terminal color scheme (schemes.js); live-update when it changes.
+        // Apply the active terminal color scheme; live-update on change. setTheme takes the xterm shape.
         function applyTermScheme() {
             if (!window.Schemes) return;
             const t = window.Schemes.toXterm(window.Schemes.active('terminal'));
-            if (t) term.options.theme = t;
+            if (t) term.setTheme(t);
         }
         applyTermScheme();
         if (window.Schemes) window.Schemes.onChange(applyTermScheme);
 
-        // --- TOUCH OWNERSHIP: a vertical pan scrolls the buffer no matter what the finger lands on.
-        // xterm's selection layer used to claim touches over rendered text, swallowing the pan (you
-        // couldn't scroll up if text was under your finger). Capture-phase handlers on the container
-        // see the gesture FIRST: past a small slop we take it (stopPropagation + manual scrollLines)
-        // so selection never engages; a tap (< slop) passes through untouched for focus/IME. ---
+        // --- TOUCH OWNERSHIP: a vertical pan scrolls the buffer. Capture-phase handlers see the gesture
+        // first; past a small slop we take it (scrollLines) so nothing else engages; a tap passes through. ---
         (function ownTouchScroll(container) {
             let startY = null, lastY = 0, panning = false;
-            const SLOP = 12;   // px before we claim the gesture
+            const SLOP = 12;
             container.addEventListener('touchstart', (e) => {
                 if (e.touches.length !== 1) { startY = null; return; }
-                startY = lastY = e.touches[0].clientY;
-                panning = false;
+                startY = lastY = e.touches[0].clientY; panning = false;
             }, { capture: true, passive: true });
             container.addEventListener('touchmove', (e) => {
                 if (startY === null || e.touches.length !== 1) return;
                 const y = e.touches[0].clientY;
-                if (!panning && Math.abs(y - startY) > SLOP) {
-                    panning = true;
-                    try { term.clearSelection(); } catch (err) {}
-                }
+                if (!panning && Math.abs(y - startY) > SLOP) { panning = true; try { term.clearSelection(); } catch (err) {} }
                 if (!panning) return;
-                e.stopPropagation();
-                e.preventDefault();
-                const cell = term._core?._renderService?.dimensions?.actualCellHeight || 18;
+                e.stopPropagation(); e.preventDefault();
+                const cell = term.cellHeight || 18;
                 const dRows = Math.trunc((lastY - y) / cell);
                 if (dRows !== 0) { term.scrollLines(dRows); lastY = y - ((lastY - y) % cell); }
             }, { capture: true, passive: false });
             const end = (e) => {
                 if (panning) e.stopPropagation();
+                // A tap (not a pan) re-focuses the inputmode=none sink so the cursor stays LIVE. Without this,
+                // tapping the terminal blurred the sink and the cursor froze (dropped to the inactive style).
+                else if (e.type === 'touchend') term.focus();
                 startY = null; panning = false;
             };
             container.addEventListener('touchend', end, { capture: true });
             container.addEventListener('touchcancel', end, { capture: true });
+            container.addEventListener('click', () => term.focus());   // desktop/mouse parity
         })(document.getElementById('terminal-container'));
 
-        // --- GBOARD BUFFER TOGGLE ---
-        // Gboard's composing buffer (swipe + autocomplete) is great for prose, wrong for a shell where
-        // every keystroke must land verbatim. Default ON (buffer kept). The password-field/no-buffer
-        // hack is opt-in via a LABELED long-press toggle so it is discoverable, not a silent override.
-        let gboardBuffer = true;   // true = composing buffer kept; false = suppressed (verbatim keys)
-        function applyGboardBuffer() {
-            const textarea = document.querySelector('.xterm-helper-textarea');
-            if (!textarea) return;
-            // A terminal never wants auto-capitalize or red-squiggle in either mode.
-            textarea.setAttribute('autocapitalize', 'off');
-            textarea.setAttribute('spellcheck', 'false');
-            if (gboardBuffer) {
-                // Buffer kept: no inputmode/password overrides (those suppress the composing buffer/swipe).
-                textarea.removeAttribute('inputmode');
-                textarea.removeAttribute('type');
-                textarea.setAttribute('autocomplete', 'off');
-            } else {
-                // Buffer suppressed: the password-input hack disables Gboard's buffer/autocomplete so
-                // keys arrive one-for-one (no swipe candidates eating control chars).
-                textarea.setAttribute('inputmode', 'text');
-                textarea.setAttribute('type', 'password');
-                textarea.setAttribute('autocomplete', 'off');
-            }
-        }
-
-        setTimeout(() => {
-            window.fitAddon.fit();
-            applyGboardBuffer();
-        }, 50);
-
-        // Long-press the terminal to flip the buffer, with a clearly labeled toast of the new state.
-        (function gboardLongPress(container) {
-            let timer = null;
-            const LONG_MS = 550;
-            const arm = (e) => {
-                if (e.touches && e.touches.length !== 1) return;
-                clearTimeout(timer);
-                timer = setTimeout(() => {
-                    gboardBuffer = !gboardBuffer;
-                    applyGboardBuffer();
-                    term.write('\x1b[33mGboard buffer: ' + (gboardBuffer ? 'on' : 'off') + '\x1b[0m\r\n');
-                    publishMenu();
-                }, LONG_MS);
-            };
-            const disarm = () => { clearTimeout(timer); timer = null; };
-            container.addEventListener('touchstart', arm, { capture: true, passive: true });
-            container.addEventListener('touchend', disarm, { capture: true });
-            container.addEventListener('touchcancel', disarm, { capture: true });
-            // A pan (the scroll handler claims it) should not also fire the long-press.
-            container.addEventListener('touchmove', disarm, { capture: true, passive: true });
-        })(document.getElementById('terminal-container'));
-
-        window.addEventListener('resize', () => window.fitAddon.fit());
-
-        // --- Backend lanes: the LOCAL repl (the in-proc runspace over the /terminal WS) and an
-        // optional PSRP session (an exclusive remote runspace over the Subsystem.Psrp pipe — Rs).
-        // The PSRP session holds the pipe exclusively while open, and is line-oriented: this
-        // presenter does the line editing, the session runs the script. Toggle: Tools → PSRP Session. ---
-        let mode = 'local';                       // 'local' | 'psrp'
-        let psrp = null;                          // exclusive PsrpSession when mode === 'psrp'
+        // --- Backend lanes: the LOCAL repl (the in-proc runspace over /terminal) and an optional PSRP
+        // session (an exclusive remote runspace over Subsystem.Psrp). The presenter does the PSRP line
+        // editing; the session runs the script. Toggle: Tools → PSRP Session. ---
+        let mode = 'local';
+        let psrp = null;
         let lineBuf = '';
 
         const ws = new WebSocketClient('/terminal', {
@@ -193,96 +164,133 @@
             onMessage: (data) => {
                 if (mode !== 'local' || typeof data !== 'string') return;
                 const idx = data.indexOf(':');
-                if (idx > -1 && parseInt(data.substring(0, idx)) === tabId) {
-                    term.write(data.substring(idx + 1));
-                }
+                if (idx > -1 && parseInt(data.substring(0, idx)) === tabId) term.write(data.substring(idx + 1));
             },
         });
         ws.connect();
 
         const PSRP_PROMPT = '\x1b[36mPS psrp>\x1b[0m ';
-
         async function runPsrpLine() {
-            const script = lineBuf;
-            lineBuf = '';
-            term.write('\r\n');
+            const script = lineBuf; lineBuf = ''; term.write('\r\n');
             if (!script.trim()) { term.write(PSRP_PROMPT); return; }
-            try {
-                const text = await psrp.run(script);
-                if (text) term.write(text.replace(/\r?\n/g, '\r\n') + '\r\n');
-            } catch (err) {
-                term.write('\x1b[31m' + String(err.message || err) + '\x1b[0m\r\n');
-            }
+            try { const text = await psrp.run(script); if (text) term.write(text.replace(/\r?\n/g, '\r\n') + '\r\n'); }
+            catch (err) { term.write('\x1b[31m' + String(err.message || err) + '\x1b[0m\r\n'); }
             term.write(PSRP_PROMPT);
         }
-
         function feedPsrpEditor(data) {
             for (const ch of data) {
                 if (ch === '\r' || ch === '\n') { runPsrpLine(); }
-                else if (ch === '\x7f' || ch === '\b') {
-                    if (lineBuf.length) { lineBuf = lineBuf.slice(0, -1); term.write('\b \b'); }
-                }
+                else if (ch === '\x7f' || ch === '\b') { if (lineBuf.length) { lineBuf = lineBuf.slice(0, -1); term.write('\b \b'); } }
                 else if (ch === '\x03') { lineBuf = ''; term.write('^C\r\n' + PSRP_PROMPT); }
                 else if (ch >= ' ') { lineBuf += ch; term.write(ch); }
             }
         }
 
+        // The ONE outbound path — typed text, d-pad keys, and pastes all arrive via term.onData.
         term.onData(data => {
-            if (mode === 'local') {
-                ws.send(JSON.stringify({ type: 'text', tabId, text: data }));
-            } else {
-                feedPsrpEditor(data);
-            }
+            if (mode === 'local') ws.send(JSON.stringify({ type: 'text', tabId, text: data }));
+            else feedPsrpEditor(data);
         });
-
-        term.onResize(({ cols, rows }) => {
-            if (mode === 'local') ws.send(JSON.stringify({ type: 'resize', tabId, cols, rows }));
-        });
+        term.onResize(({ cols, rows }) => { if (mode === 'local') ws.send(JSON.stringify({ type: 'resize', tabId, cols, rows })); });
 
         async function setMode(next) {
             if (next === mode) return;
             if (next === 'psrp') {
                 try {
-                    psrp = new PsrpSession('terminal-' + tabId);
-                    await psrp.open();
-                    mode = 'psrp';
-                    term.write('\r\n\x1b[36m[PSRP]\x1b[0m remote runspace over \x1b[1mSubsystem.Psrp\x1b[0m — ' +
-                               'exclusive while open (shared-lane file ops queue behind it).\r\n');
+                    psrp = new PsrpSession('terminal-' + tabId); await psrp.open(); mode = 'psrp';
+                    term.write('\r\n\x1b[36m[PSRP]\x1b[0m remote runspace over \x1b[1mSubsystem.Psrp\x1b[0m — exclusive while open.\r\n');
                     term.write(PSRP_PROMPT);
-                } catch (err) {
-                    term.write('\r\n\x1b[31mPSRP session failed: ' + String(err.message || err) + '\x1b[0m\r\n');
-                    psrp = null;
-                }
+                } catch (err) { term.write('\r\n\x1b[31mPSRP session failed: ' + String(err.message || err) + '\x1b[0m\r\n'); psrp = null; }
             } else {
                 try { if (psrp) psrp.close(); } catch (e) {}
-                psrp = null;
-                lineBuf = '';
-                mode = 'local';
+                psrp = null; lineBuf = ''; mode = 'local';
                 term.write('\r\n\x1b[36m[local]\x1b[0m back on the in-proc runspace.\r\n');
             }
             publishMenu();
         }
 
+        // --- joystick: drag the nub to send arrows (hold-to-repeat for history/cursor); a TAP on the nub
+        //     is Enter; drag the RING to reposition the whole bubble. Ported from the flickpaint thumbstick
+        //     (clamp-to-radius + 4-way resolve), tuned for the shell. The non-arrow keys ride #stick-keys.
+        (function joystick() {
+            const stick = document.getElementById('stick');
+            const nub = document.getElementById('nub');
+            const keys = document.getElementById('stick-keys');
+            const M = 38, DEAD = 16;              // max nub travel; dead zone before a direction registers
+            let mode = null, sx = 0, sy = 0, off = { x: 0, y: 0 }, moved = false;
+            let dir = null, hold = null, base = null;
+
+            const arrowFor = (o) => {
+                if (Math.hypot(o.x, o.y) < DEAD) return null;
+                return Math.abs(o.x) > Math.abs(o.y) ? (o.x < 0 ? 'left' : 'right') : (o.y < 0 ? 'up' : 'down');
+            };
+            const setDir = (d) => {
+                if (d === dir) return;
+                dir = d;
+                if (hold) { clearInterval(hold); hold = null; }
+                if (d) { term.key(d); hold = setInterval(() => term.key(d), 120); }   // fire now + repeat while held
+            };
+
+            stick.addEventListener('pointerdown', (e) => {
+                e.preventDefault(); stick.setPointerCapture(e.pointerId);
+                const r = stick.getBoundingClientRect();
+                const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+                mode = Math.hypot(e.clientX - cx, e.clientY - cy) < 36 ? 'flick' : 'move';   // nub -> flick, ring -> move
+                sx = e.clientX; sy = e.clientY; moved = false; off = { x: 0, y: 0 };
+                if (mode === 'move') base = { x: r.left, y: r.top };
+            });
+            stick.addEventListener('pointermove', (e) => {
+                if (!mode) return;
+                if (mode === 'flick') {
+                    let nx = e.clientX - sx, ny = e.clientY - sy; const d = Math.hypot(nx, ny);
+                    if (d > M) { nx = nx / d * M; ny = ny / d * M; }
+                    if (d > 6) moved = true;
+                    off = { x: nx, y: ny };
+                    nub.style.transform = `translate(${nx}px,${ny}px)`;
+                    setDir(arrowFor(off));
+                } else {                          // reposition the bubble + its key strip
+                    const nx = base.x + (e.clientX - sx), ny = base.y + (e.clientY - sy);
+                    for (const el of [stick, keys]) { el.style.right = 'auto'; el.style.bottom = 'auto'; el.style.left = nx + 'px'; }
+                    stick.style.top = ny + 'px'; keys.style.top = (ny - 40) + 'px';
+                }
+            });
+            const release = () => {
+                if (!mode) return;
+                if (mode === 'flick') {
+                    setDir(null);                                   // stop repeat
+                    if (!moved) term.key('enter');                  // a tap on the nub = Enter
+                    nub.style.transition = 'transform .15s'; nub.style.transform = 'translate(0,0)';
+                    setTimeout(() => { nub.style.transition = 'none'; }, 160);
+                }
+                mode = null; term.focus();
+            };
+            stick.addEventListener('pointerup', release);
+            stick.addEventListener('pointercancel', release);
+
+            // the compact non-arrow strip
+            const send = (seq) => { term.input(seq); term.focus(); };
+            keys.querySelectorAll('[data-seq]').forEach(b => b.addEventListener('pointerdown', (e) => { e.preventDefault(); send(b.getAttribute('data-seq')); }));
+            document.getElementById('sk-esc').addEventListener('pointerdown', (e) => { e.preventDefault(); term.key('esc'); term.focus(); });
+            document.getElementById('sk-tab').addEventListener('pointerdown', (e) => { e.preventDefault(); term.key('tab'); term.focus(); });
+            document.getElementById('sk-kb').addEventListener('pointerdown', (e) => { e.preventDefault(); const on = term.toggleKeyboard(); keys.classList.toggle('kbd-on', on); });
+            document.getElementById('sk-clr').addEventListener('pointerdown', (e) => { e.preventDefault(); term.clear(); term.focus(); });
+        })();
+
         // Conformance (REGISTRY-SPEC §6/§8): contribute verbs; the Shell's Menu/Charms present them.
         function publishMenu() {
             if (!window.Presenter) return;
             Presenter.menu('terminal', [
-                { menu: 'edit', verb: 'copy',  label: 'Copy' },
+                { menu: 'edit', verb: 'copy', label: 'Copy' },
                 { menu: 'edit', verb: 'paste', label: 'Paste' },
                 { menu: 'view', verb: 'clear', label: 'Clear Output' },
+                { menu: 'view', verb: 'keyboard', label: 'Soft Keyboard' },
                 { menu: 'tools', verb: 'psrp', label: 'PSRP Session', checked: mode === 'psrp' },
-                { menu: 'tools', verb: 'gboard', label: 'Gboard buffer: ' + (gboardBuffer ? 'on' : 'off'), checked: gboardBuffer },
             ]);
         }
         if (window.Presenter) Presenter.onVerb((v) => {
             if (v === 'clear') term.clear();
+            else if (v === 'keyboard') { const on = term.toggleKeyboard(); document.getElementById('stick-keys').classList.toggle('kbd-on', on); }
             else if (v === 'psrp') setMode(mode === 'psrp' ? 'local' : 'psrp');
-            else if (v === 'gboard') {
-                gboardBuffer = !gboardBuffer;
-                applyGboardBuffer();
-                term.write('\x1b[33mGboard buffer: ' + (gboardBuffer ? 'on' : 'off') + '\x1b[0m\r\n');
-                publishMenu();
-            }
             else if (v === 'copy') { try { navigator.clipboard.writeText(term.getSelection() || ''); } catch (e) {} }
             else if (v === 'paste') {
                 try { navigator.clipboard.readText().then((t) => {
