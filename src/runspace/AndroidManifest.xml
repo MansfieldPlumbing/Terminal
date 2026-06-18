@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.mansfieldplumbing.subsystem">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Granular runtime permissions the assistant can request individually -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
+    <uses-permission android:name="android.permission.BODY_SENSORS" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- DEV ONLY: debuggable enables `adb push` + `run-as` of model weights straight into
+         private files/models/ (see tools/Push-SubsystemModel.ps1). Do not ship a debuggable build. -->
+    <application android:usesCleartextTraffic="true"
+        android:debuggable="true"
+        android:label="Subsystem"
+        android:allowBackup="true"
+        android:icon="@mipmap/appicon"
+        android:roundIcon="@mipmap/appicon_round"
+        android:supportsRtl="true"
+        android:extractNativeLibs="true"
+        android:hardwareAccelerated="true">
+        <!-- LiteRT-LM GPU (OpenCL) backend for the Hb. required=false so devices without OpenCL still
+             install and fall back to the CPU backend (LiteRtChatClient.EnsureEngine). -->
+        <uses-native-library android:name="libOpenCL.so" android:required="false" />
+
+        <!-- THE FEDERATION doors (2026-06-10e), de-spammed (2026-06-11): one activity-alias per door,
+             all targeting MainActivity. The alias component name's suffix (…door.<Id>) IS the door id:
+             MainActivity reads it and loads that presenter full-bleed (no shell chrome). The aliases
+             carry NO MAIN/LAUNCHER intent-filter — exactly ONE launcher entry exists (MainActivity,
+             generated from its [Activity(MainLauncher=true)] attribute). Doors stay addressable by
+             explicit component name (exported), e.g. shortcuts/`am start -n …/.door.Editor`.
+             (The legacy com.mansfieldplumbing service element was dead — wrong package prefix; the
+             C# [Service] attribute generates the real one — and has been removed.) -->
+        <activity-alias
+            android:name="dev.mansfieldplumbing.subsystem.door.Editor"
+            android:targetActivity="dev.mansfieldplumbing.subsystem.MainActivity"
+            android:label="Editor"
+            android:icon="@mipmap/appicon"
+            android:exported="true" />
+        <activity-alias
+            android:name="dev.mansfieldplumbing.subsystem.door.Terminal"
+            android:targetActivity="dev.mansfieldplumbing.subsystem.MainActivity"
+            android:label="Terminal"
+            android:icon="@mipmap/appicon"
+            android:exported="true" />
+        <activity-alias
+            android:name="dev.mansfieldplumbing.subsystem.door.Settings"
+            android:targetActivity="dev.mansfieldplumbing.subsystem.MainActivity"
+            android:label="SS Settings"
+            android:icon="@mipmap/appicon"
+            android:exported="true" />
+        <activity-alias
+            android:name="dev.mansfieldplumbing.subsystem.door.Broker"
+            android:targetActivity="dev.mansfieldplumbing.subsystem.MainActivity"
+            android:label="Broker"
+            android:icon="@mipmap/appicon"
+            android:exported="true" />
+    </application>
+</manifest>
+

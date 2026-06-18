@@ -1,0 +1,120 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- arm64 by default (fast S23 loop). Opt into a fat arm64+x64 APK for Cuttlefish/emulator with -p:SsX64=true. -->
+    <RuntimeIdentifiers Condition="'$(SsX64)' == 'true'">android-arm64;android-x64</RuntimeIdentifiers>
+    <RuntimeIdentifiers Condition="'$(RuntimeIdentifiers)' == ''">android-arm64</RuntimeIdentifiers>
+    <TargetFramework>net11.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>36.0</SupportedOSPlatformVersion>
+    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <ApplicationId>dev.mansfieldplumbing.subsystem</ApplicationId>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <PublishTrimmed>false</PublishTrimmed>
+    <DebugSymbols>false</DebugSymbols>
+    <DebugType>none</DebugType>
+    <!-- The Windows head (runspace/windows) shares this tree but is a SEPARATE project (SubsystemWin.csproj);
+         exclude it from EVERY Android default item glob (Compile/None/EmbeddedResource) so the APK never
+         tries to compile WinForms/WebView2/DirectPort source. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);Frontend\**;windows\**</DefaultItemExcludes>
+    <!-- Keep the toxic diagnostic thread disabled -->
+    <EnableEventPipe>false</EnableEventPipe>
+    <EventSourceSupport>false</EventSourceSupport>
+    <DebuggerSupport>false</DebuggerSupport>
+    <!-- BUILD JDK = 21 (LTS), pinned. The LiteRT-LM AAR is Java-21 (class v65) bytecode; implementing
+         IMessageCallback generates an ACW javac must compile against it, so the build MUST use JDK 21.
+         The machine's JAVA_HOME points at JDK 17 (fails "class file version 65.0, should be 61.0"), so
+         we set the JDK explicitly here — do NOT rely on JAVA_HOME. Do NOT bump to JDK 25/26: the .NET
+         Android workload validates against 21; newer is unverified and risks toolchain breakage.
+         Path is dynamic: $env:SS_JDK overrides (e.g. JDK moved drives); else falls back to the JBR. -->
+    <JavaSdkDirectory Condition="'$(SS_JDK)' != ''">$(SS_JDK)</JavaSdkDirectory>
+    <!-- Drive-relative fallback (no hardcoded drive letters — dev.psm1 law): <repo drive>\jdk. -->
+    <JavaSdkDirectory Condition="'$(JavaSdkDirectory)' == '' And Exists('$([System.IO.Path]::GetPathRoot($(MSBuildProjectDirectory)))jdk')">$([System.IO.Path]::GetPathRoot($(MSBuildProjectDirectory)))jdk</JavaSdkDirectory>
+    <JavacSourceVersion>21</JavacSourceVersion>
+    <JavacTargetVersion>21</JavacTargetVersion>
+    <!-- libpsl .so resolution: $env:SS_LIBS overrides; else src\runspace\libs.
+         libpsl-android.so builds from native\build-native.ps1; libpsl-native.so is PowerShell's
+         own native lib (prebuilt — ships in the release assets, not generated here). -->
+    <SsLibs Condition="'$(SS_LIBS)' != ''">$(SS_LIBS)</SsLibs>
+    <SsLibs Condition="'$(SsLibs)' == ''">$(MSBuildProjectDirectory)\libs</SsLibs>
+    <!-- Build posture = the AdbElevation ceiling. DEV is defined by default so ss-build keeps the
+         elevated-adb dev workflow; a release build (-p:SubsystemRelease=true) compiles DEV out, so the
+         self-elevation path is physically ABSENT from the binary — a forwarded release APK cannot
+         self-elevate to uid=2000 and starts no adb mDNS multicast. The ceiling is the compiler, not a
+         runtime flag the runspace could forge. (No permission by default; release = harmless app.) -->
+    <DefineConstants Condition="'$(SubsystemRelease)' != 'true'">$(DefineConstants);DEV</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.7.0-preview.2">
+      <ExcludeAssets>native</ExcludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.AI" Version="9.0.0-preview.9.24556.5" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
+    <!-- De-risk: the registry's durable plane. Pulls SQLitePCLRaw + native e_sqlite3 for android-arm64. -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- FORCE the compiler to use your safe dummy libraries (now at $(SsLibs), outside src) -->
+    <AndroidNativeLibrary Include="$(SsLibs)\arm64-v8a\libpsl-native.so" />
+    <AndroidNativeLibrary Include="$(SsLibs)\arm64-v8a\libpsl-android.so" />
+    <!-- TEMPORARILY bundled: the monolithic LiteRT-LM C-API prebuilt (Apache-2.0, flutter_gemma) for the
+         C-API LiteRtRuntime proof of life (~38MB). The dynamic-fetch path replaces this bundling later. -->
+    <AndroidNativeLibrary Include="$(SsLibs)\arm64-v8a\libLiteRtLm.so" />
+    <!-- libLiteRtLm.so's only non-system DT_NEEDED (the rest are on-device system libs; GPU/QNN are
+         dlopen'd, soft). Bundle this for the CPU path; accelerators come later for the GPU/NPU spike. -->
+    <AndroidNativeLibrary Include="$(SsLibs)\arm64-v8a\libGemmaModelConstraintProvider.so" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(SsX64)' == 'true'">
+    <!-- x86_64 libpsl stubs for Cuttlefish / x86_64 emulator (ABI inferred from the path). -->
+    <AndroidNativeLibrary Include="$(SsLibs)\x86_64\libpsl-native.so" />
+    <AndroidNativeLibrary Include="$(SsLibs)\x86_64\libpsl-android.so" />
+  </ItemGroup>
+  <ItemGroup>
+    <AndroidEnvironment Include="environment.txt" />
+  </ItemGroup>
+  <!-- pshelp.json removed: help is being redesigned to individual about_*.md resources.
+       HelpSystem.cs null-guards its absence (degrades to built-in cmdlet help). -->
+
+
+  <ItemGroup>
+    <PackageReference Include="VtNetCore" Version="1.0.30" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Stage A: the NT-invariant Roslyn analyzers (SS001–009) run at build, find slop via the
+         semantic model (not text), and gate every commit. Analyzer-only: never linked into the APK. -->
+    <ProjectReference Include="..\analyzers\Subsystem.Analyzers.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+    <!-- The contract's seed (docs/CONTRACT.md §3): SS011-SS016 read the closed vocabulary and the
+         component DAG from this one file at compile time; the Registrar projects the SAME file into
+         \System\Contract at boot. One seed, two consumers. Missing/unparsable => SS000 (fail-closed). -->
+    <AdditionalFiles Include="..\analyzers\SystemCatalog.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The shell is COMPILED, not shipped loose: every presenter/support file under src/shell
+         embeds into the assembly with an explicit LogicalName that IS its virtual path —
+         ObpHost serves it from RAM; ProjectionServer never reads the asset dir for the shell.
+         No loose html/assets in the unzipped APK. -->
+    <EmbeddedResource Include="..\shell\**\*">
+      <LogicalName>shell/%(RecursiveDir)%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+    <!-- The .ps1 cmdlet "zoo" — User-tier script cmdlets (adb-reads,
+         binder-surface, AppFunctions, the ConvertFrom-* parsers). Shipped as APK assets under
+         zoo/ and imported at runspace init from the asset FILE — never embedded as a .cs string
+         (SS001). Lives in src/runspace/scripts/zoo (now tracked; the over-broad scripts/ ignore
+         was anchored to root). -->
+    <AndroidAsset Include="scripts\zoo\**\*.ps1" Link="zoo\%(RecursiveDir)%(Filename)%(Extension)" />
+    <!-- HTML applets — single-file apps (content\html-applets at the repo root), shipped LOOSE as
+         AndroidAssets under assets/shell/html-applets/ so ObpHost's asset-fallback rung serves them
+         and the Registrar seeds each as a launchable object. Drop a .html in = it's an app. -->
+    <AndroidAsset Include="..\..\content\html-applets\**\*.html" Link="shell\html-applets\%(RecursiveDir)%(Filename)%(Extension)" />
+    <!-- Web-agent test fixtures — dead-simple deterministic pages for the WebDrive loop. Shipped under
+         assets/shell/web-fixtures/; the agent WebView loads them via
+         file:///android_asset/shell/web-fixtures/<name>.html (air-gapped, no live-internet flakiness). -->
+    <AndroidAsset Include="..\..\content\web-fixtures\**\*.html" Link="shell\web-fixtures\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

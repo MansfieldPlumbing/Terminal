@@ -1,0 +1,35 @@
+# Subsystem — analyzer severities for the NT-invariant analyzers (Stage A).
+#
+# The SS0xx diagnostics encode the one disease: truth held outside the one namespace. Severity per the
+# plan: SS001 + the structural rules ratchet to `error` (the build does not pass until the rot is gone);
+# the judgment rules ride at `warning` until each finding is triaged.
+
+root = true
+
+[*.cs]
+# Structural invariants — hard gate (error). The tree does not build until each campaign reaches zero.
+dotnet_diagnostic.SS001.severity = error   # no PowerShell-source strings in .cs
+dotnet_diagnostic.SS002.severity = error   # no forged kernel Handle
+dotnet_diagnostic.SS004.severity = error   # no fabricated namespace-path literals
+dotnet_diagnostic.SS005.severity = error   # no System-integrity capability carrying a Source body
+dotnet_diagnostic.SS008.severity = error   # cmdlets return VOM handles, not raw memory
+
+# Judgment invariants — warning until triaged (some hits are legitimate; each is reviewed).
+dotnet_diagnostic.SS003.severity = warning # static dictionary as object store
+dotnet_diagnostic.SS006.severity = warning # per-call new Random()
+dotnet_diagnostic.SS007.severity = warning # empty catch swallows the error
+dotnet_diagnostic.SS009.severity = warning # ambient Task.Run / new Thread (route through Ps/Spawn)
+dotnet_diagnostic.SS010.severity = warning # hardcoded absolute path / URL (resolve from Cm)
+
+# The contract gate (docs/CONTRACT.md §3/§6; vocabulary + DAG from src/analyzers/SystemCatalog.json).
+# SS000 is the fail-closed guard: catalog missing/unparsable = the gate is OFF = error, immediately.
+# SS011-SS016 ride at WARNING pending the census (§7 build order: census -> baselines -> THEN errors
+# with shrink-only baselines; severities never soften, baselines absorb the legacy).
+dotnet_diagnostic.SS000.severity = error   # SystemCatalog.json unavailable — the gate is off
+dotnet_diagnostic.SS011.severity = warning # namespace not in the component catalog
+dotnet_diagnostic.SS012.severity = warning # type grammar (banned suffix / context word / platform collision)
+dotnet_diagnostic.SS013.severity = warning # method verb not in the closed verb list
+dotnet_diagnostic.SS014.severity = warning # component DAG (reference direction)
+dotnet_diagnostic.SS015.severity = warning # static field remembers state in a component
+dotnet_diagnostic.SS016.severity = warning # handle value parsed outside the kernel
+dotnet_diagnostic.SS017.severity = warning # banned word (alwaysFlag) anywhere; casual/inflammatory comment (commentPatterns)

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Minimal descriptor so SubsystemRecognitionService parses as a valid
+     RecognitionService (required because interaction.xml references it as the
+     recognitionService for the voice-interaction-service). We do not actually
+     perform recognition here yet — the local model handles audio directly. -->
+<recognition-service xmlns:android="http://schemas.android.com/apk/res/android" />

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <base href="/">
+    <link rel="stylesheet" href="/theme.css">
+    <script src="/themes.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Screen Mirror</title>
+    <style>
+        body, html {
+            margin: 0; padding: 0; height: 100%; width: 100%;
+            background-color: var(--bg);
+            font-family: var(--font-sans);
+            overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+        #screen-container {
+            flex: 1; position: relative;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #screen-img {
+            max-width: 100%; max-height: 100%;
+            object-fit: contain;
+            image-rendering: optimizeSpeed;
+            display: none;
+        }
+        #screen-placeholder {
+            color: var(--muted); font-size: 14px; text-align: center; padding: 20px;
+        }
+        .btn-action {
+            padding: 8px 16px; margin-top: 12px; background: color-mix(in srgb, var(--accent) 20%, transparent);
+            border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 4px; color: var(--accent); cursor: pointer;
+        }
+    </style>
+  <script src="/shell/presenter.js"></script>
+</head>
+<body>
+    <div id="screen-container">
+        <div id="screen-placeholder">
+            Screen Mirroring is inactive.<br><br>
+            <button onclick="startScreenCapture()" class="btn-action">Start Mirroring</button>
+        </div>
+        <img id="screen-img" alt="Screen Mirror" draggable="false" />
+    </div>
+
+    <script>
+        // The mirror prefers its isolated stream port (heavy frames off the UI port) but falls
+        // back to the SAME-origin /screen route (the backend serves both) — no hard port truth.
+        const STREAM_PORTS = [8081, parseInt(location.port || '8080')];
+        const screenImg = document.getElementById('screen-img');
+        const screenPlaceholder = document.getElementById('screen-placeholder');
+        let screenWs;
+        let portIdx = 0;
+
+        function setWaiting(text) {
+            screenPlaceholder.style.display = '';
+            screenImg.style.display = 'none';
+            screenPlaceholder.firstChild.textContent = text;
+        }
+
+        function startScreenCapture() {
+            if (window.AndroidBridge && window.AndroidBridge.startScreenCapture) {
+                window.AndroidBridge.startScreenCapture();
+            } else {
+                // /api/exec takes the RAW command text as the body (no JSON envelope).
+                fetch('/api/exec', { method: 'POST', headers: { 'X-Subsystem-Cap': (window.AndroidBridge?.getCap?.()||window.__ssCap||'') }, body: 'Start-ScreenCapture' });
+            }
+            setWaiting('Waiting for the first frame…');
+            // Give it time to start
+            setTimeout(() => {
+                if (!screenWs || screenWs.readyState !== WebSocket.OPEN) {
+                    connectScreen();
+                }
+            }, 3000);
+        }
+
+        function connectScreen() {
+            if (screenWs) screenWs.close();
+            const port = STREAM_PORTS[portIdx % STREAM_PORTS.length];
+            screenWs = new WebSocket(`ws://${location.hostname || '127.0.0.1'}:${port}/screen?cap=${encodeURIComponent(window.AndroidBridge?.getCap?.()||window.__ssCap||'')}`);
+            screenWs.binaryType = 'blob';
+            screenWs.onmessage = (ev) => {
+                if (screenPlaceholder.style.display !== 'none') {
+                    screenPlaceholder.style.display = 'none';
+                    screenImg.style.display = 'block';
+                }
+                const url = URL.createObjectURL(ev.data);
+                screenImg.onload = () => URL.revokeObjectURL(url);
+                screenImg.src = url;
+            };
+            screenWs.onclose = () => { portIdx++; setTimeout(connectScreen, 2000); };
+        }
+
+        connectScreen();
+
+        // Screen Interaction (Tap Injection)
+        screenImg.addEventListener('click', (e) => {
+            if (!screenWs || screenWs.readyState !== WebSocket.OPEN) return;
+            const rect = screenImg.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width;
+            const y = (e.clientY - rect.top) / rect.height;
+            screenWs.send(JSON.stringify({ type: 'tap', x, y }));
+        });
+    </script>
+</body>
+</html>

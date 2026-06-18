@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    subsystem-check — the on-demand code checker. Loads the real project through MSBuildWorkspace (so
+    references resolve semantically), runs the SS001-009 analyzers (the SAME DLL the build gates with),
+    and answers "what references this symbol?" via SymbolFinder. The structural replacement for grep:
+    a hit is a real reference, queryable in seconds without an Android build or a device.
+
+    Runs on the Windows dev box (plain net, not android). Publishes to <drive>\bin.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net11.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>subsystem-check</AssemblyName>
+    <RollForward>LatestMajor</RollForward>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Build.Locator" Version="1.7.8" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.0.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
+    <!-- The C# language service for MSBuildWorkspace (else "language 'C#' is not supported"). -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.0.0" />
+    <!-- Normal reference (not OutputItemType=Analyzer): we instantiate the analyzer types ourselves. -->
+    <ProjectReference Include="..\..\analyzers\Subsystem.Analyzers.csproj" />
+  </ItemGroup>
+
+</Project>

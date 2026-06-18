@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Roku</title>
+  <base href="/">
+  <link rel="stylesheet" href="/theme.css">
+  <script src="/themes.js"></script>
+<style>
+:root{
+  --bg:#0a0a0c;
+  --shell-a:#242427;
+  --shell-b:#0e0e10;
+  --key:#2a2a2e;
+  --key-b:#191919;
+  --key-edge:#3d3d42;
+  --ink:#f4f4f5;
+  --ink-dim:#9a9aa2;
+  --purple:#7b2fd6;
+  --purple-d:#4a1f86;
+  --blue:#3d6bff;
+  --good:#3ddc84;
+  --bad:#ff4d4d;
+  --pad-x:46px;            /* shared column inset so rows align */
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;font-family:var(--font-sans);touch-action:manipulation;}
+html,body{height:100%;width:100%;background:radial-gradient(130% 90% at 50% 0%,#181320 0%,var(--bg) 60%);overflow:hidden;display:flex;justify-content:center;align-items:center;color:var(--ink);}
+
+.shell{
+  position:relative;
+  width:min(100vw - 26px, 348px);
+  height:min(100vh - 16px, 800px);
+  background:linear-gradient(178deg,var(--shell-a) 0%,#1a1a1d 22%,var(--shell-b) 100%);
+  border-radius:46px;
+  padding:max(env(safe-area-inset-top),26px) 24px max(env(safe-area-inset-bottom),30px);
+  display:flex;flex-direction:column;
+  box-shadow:0 0 0 1px #000, inset 0 2px 1px rgba(255,255,255,.06), inset 0 -30px 60px rgba(0,0,0,.5), 0 50px 90px -25px rgba(0,0,0,.85);
+}
+
+/* ---------- side hardware buttons (right edge, like the real remote) ---------- */
+.nub{position:absolute;right:-5px;width:6px;border-radius:0 4px 4px 0;background:linear-gradient(90deg,#1c1c1f,#3a3a3e);box-shadow:1px 0 2px rgba(0,0,0,.6);}
+.nub.power{top:9%;height:40px;}
+.nub.volup{top:32%;height:46px;}
+.nub.voldn{top:calc(32% + 52px);height:46px;}
+/* invisible wide hit targets over the nubs */
+.sidehit{position:absolute;right:0;width:30px;background:transparent;border:none;cursor:pointer;}
+.sidehit.power{top:8%;height:46px;}
+.sidehit.volup{top:31%;height:52px;}
+.sidehit.voldn{top:calc(31% + 52px);height:52px;}
+
+/* ---------- header ---------- */
+.top{display:flex;align-items:center;justify-content:space-between;padding:0 var(--pad-x);flex-shrink:0;}
+.fkey{
+  width:46px;height:46px;border-radius:50%;
+  background:linear-gradient(180deg,var(--key),var(--key-b));
+  border:1px solid var(--key-edge);color:var(--ink);font-size:20px;
+  display:grid;place-items:center;cursor:pointer;
+  box-shadow:0 3px 0 #000, inset 0 1px 0 rgba(255,255,255,.07);
+  transition:transform .06s,box-shadow .06s;
+}
+.fkey:active{transform:translateY(3px);box-shadow:0 0 0 #000, inset 0 2px 6px rgba(0,0,0,.7);}
+
+/* ---------- D-pad ---------- */
+.dpad-wrap{flex:1 1 auto;display:grid;place-items:center;min-height:0;}
+.dpad{position:relative;width:min(64vw,222px);aspect-ratio:1;border-radius:50%;
+  background:radial-gradient(circle at 50% 38%,#2c2c30,#1b1b1e 70%,#121214);
+  box-shadow:0 16px 34px -12px rgba(0,0,0,.85), inset 0 2px 1px rgba(255,255,255,.06), inset 0 -10px 22px rgba(0,0,0,.55);
+  border:1px solid #050506;}
+.dpad::before{content:"";position:absolute;inset:6px;border-radius:50%;border:1.5px solid rgba(123,47,214,.30);pointer-events:none;}
+.arc{position:absolute;width:50%;height:50%;border:none;background:transparent;color:var(--purple);
+  font-size:21px;cursor:pointer;display:grid;place-items:center;transition:background .08s,color .08s,filter .08s;filter:drop-shadow(0 0 1px rgba(123,47,214,.6));}
+.arc.up{top:0;left:25%;align-items:start;padding-top:16px;border-radius:50% 50% 0 0/100% 100% 0 0;}
+.arc.dn{bottom:0;left:25%;align-items:end;padding-bottom:16px;border-radius:0 0 50% 50%/0 0 100% 100%;}
+.arc.lf{left:0;top:25%;justify-items:start;padding-left:16px;border-radius:50% 0 0 50%/100% 0 0 100%;}
+.arc.rt{right:0;top:25%;justify-items:end;padding-right:16px;border-radius:0 50% 50% 0/0 100% 100% 0;}
+.arc.act{background:rgba(123,47,214,.22);color:#fff;}
+.ok{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:42%;height:42%;border-radius:50%;
+  background:radial-gradient(circle at 38% 32%,#34343a,#202024 60%,#161619);
+  color:var(--ink);font-weight:700;font-size:17px;letter-spacing:1px;border:1px solid #050506;cursor:pointer;
+  box-shadow:0 6px 14px -4px rgba(0,0,0,.8), inset 0 2px 3px rgba(255,255,255,.12), inset 0 -5px 9px rgba(0,0,0,.5);
+  transition:transform .07s;}
+.ok:active{transform:translate(-50%,-50%) scale(.92);}
+
+/* ---------- secondary rows ---------- */
+.nav2{display:flex;align-items:center;justify-content:space-between;padding:0 var(--pad-x);margin-top:6px;flex-shrink:0;}
+.icn{background:none;border:none;color:var(--ink-dim);font-size:22px;cursor:pointer;width:46px;height:40px;display:grid;place-items:center;transition:transform .06s,color .06s;}
+.icn:active{transform:scale(.86);color:#fff;}
+
+.media{display:flex;justify-content:center;gap:10px;margin-top:14px;flex-shrink:0;}
+.mkey{
+  width:64px;height:42px;border-radius:11px;
+  background:linear-gradient(180deg,var(--key),var(--key-b));
+  border:1px solid var(--key-edge);color:var(--ink);font-size:16px;
+  display:grid;place-items:center;cursor:pointer;
+  box-shadow:0 3px 0 #000, inset 0 1px 0 rgba(255,255,255,.06);
+  transition:transform .06s,box-shadow .06s;
+}
+.mkey:active{transform:translateY(3px);box-shadow:0 0 0 #000, inset 0 2px 6px rgba(0,0,0,.7);}
+
+/* ---------- apps 2x2 ---------- */
+.apps{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:18px;padding:0 8px;flex-shrink:0;}
+.app{height:42px;border-radius:9px;border:1px solid rgba(255,255,255,.10);cursor:pointer;font-weight:700;
+  font-size:14px;letter-spacing:.3px;display:grid;place-items:center;overflow:hidden;
+  box-shadow:0 3px 7px -2px rgba(0,0,0,.6);transition:transform .07s;}
+.app:active{transform:scale(.95);}
+
+/* ---------- footer wordmark + status ---------- */
+.foot{margin-top:auto;padding-top:14px;display:flex;align-items:center;justify-content:center;gap:10px;flex-shrink:0;}
+.wordmark{font-weight:700;font-size:13px;letter-spacing:.5px;color:#fff;background:var(--purple-d);
+  padding:4px 12px;border-radius:5px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ink-dim);transition:.25s;}
+.dot.on{background:var(--good);box-shadow:0 0 8px var(--good);}
+.dot.off{background:var(--bad);}
+.kbtn{position:absolute;left:18px;bottom:max(env(safe-area-inset-bottom),18px);background:none;border:none;color:#4a4a50;font-size:17px;cursor:pointer;}
+.kbtn:active{color:#fff;}
+
+/* ---------- sheets ---------- */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(3px);display:none;z-index:30;}
+.scrim.show{display:block;}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:40;background:linear-gradient(180deg,#202024,#161618);
+  border-radius:22px 22px 0 0;border-top:1px solid var(--key-edge);padding:18px 20px max(env(safe-area-inset-bottom),20px);
+  transform:translateY(110%);transition:transform .26s cubic-bezier(.2,.8,.2,1);max-width:420px;margin:0 auto;}
+.sheet.show{transform:translateY(0);}
+.sheet h3{font-size:15px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;}
+.sheet h3 span{color:var(--ink-dim);font-weight:500;font-size:13px;cursor:pointer;}
+label{display:block;font-size:11px;color:var(--ink-dim);margin:12px 0 5px;font-weight:600;letter-spacing:.4px;}
+input,textarea{width:100%;background:#0f0f11;border:1px solid var(--key-edge);border-radius:10px;color:var(--ink);
+  font-size:15px;padding:12px 14px;outline:none;font-family:inherit;}
+input:focus,textarea:focus{border-color:var(--purple);}
+textarea{resize:none;min-height:84px;font-size:13px;line-height:1.5;}
+code{background:#000;padding:1px 5px;border-radius:4px;font-size:12px;color:#c9a6ff;}
+.hint{font-size:11px;color:var(--ink-dim);margin-top:6px;line-height:1.45;}
+.save{margin-top:16px;width:100%;height:48px;border:none;border-radius:12px;background:linear-gradient(180deg,var(--purple),var(--purple-d));
+  color:#fff;font-weight:700;font-size:15px;cursor:pointer;}
+.save:active{transform:scale(.98);}
+.kbrow{display:flex;gap:10px;margin-top:12px;}
+.kbrow .mkey{flex:1;height:46px;font-size:13px;font-weight:600;width:auto;}
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- side hardware buttons -->
+  <span class="nub power"></span><span class="nub volup"></span><span class="nub voldn"></span>
+  <button class="sidehit power" onpointerdown="tap('Power')" aria-label="Power"></button>
+  <button class="sidehit volup" data-key="VolumeUp" aria-label="Volume up"></button>
+  <button class="sidehit voldn" data-key="VolumeDown" aria-label="Volume down"></button>
+
+  <!-- Back / Home -->
+  <div class="top">
+    <button class="fkey" onpointerdown="tap('Back')">&#8592;</button>
+    <button class="fkey" onpointerdown="tap('Home')">&#8962;</button>
+  </div>
+
+  <!-- D-pad -->
+  <div class="dpad-wrap">
+    <div class="dpad">
+      <button class="arc up" data-key="Up">&#9650;</button>
+      <button class="arc dn" data-key="Down">&#9660;</button>
+      <button class="arc lf" data-key="Left">&#9664;</button>
+      <button class="arc rt" data-key="Right">&#9654;</button>
+      <button class="ok" onpointerdown="tap('Select')">OK</button>
+    </div>
+  </div>
+
+  <!-- Instant Replay / Options -->
+  <div class="nav2">
+    <button class="icn" onpointerdown="tap('InstantReplay')" title="Instant replay">&#8634;</button>
+    <button class="icn" onpointerdown="tap('Info')" title="Options">&#10033;</button>
+  </div>
+
+  <!-- transport -->
+  <div class="media">
+    <button class="mkey" onpointerdown="tap('Rev')">&#9194;</button>
+    <button class="mkey" onpointerdown="tap('Play')">&#9199;</button>
+    <button class="mkey" onpointerdown="tap('Fwd')">&#9193;</button>
+  </div>
+
+  <!-- apps -->
+  <div class="apps" id="apps"></div>
+
+  <!-- footer -->
+  <div class="foot">
+    <span class="wordmark" onclick="openSettings()"><span class="dot" id="dot"></span>Roku</span>
+  </div>
+  <button class="kbtn" onclick="openSearch()" title="Keyboard">&#9000;</button>
+
+</div>
+
+<!-- Search sheet -->
+<div class="scrim" id="scrim-s" onclick="closeSheets()"></div>
+<div class="sheet" id="sheet-search">
+  <h3>Type on TV <span onclick="closeSheets()">Done</span></h3>
+  <input id="searchbox" placeholder="Characters send live to the Roku..." autocomplete="off" autocapitalize="off" spellcheck="false">
+  <div class="kbrow">
+    <button class="mkey" onpointerdown="tap('Backspace')">&#9003; Delete</button>
+    <button class="mkey" onpointerdown="tap('Enter')">&#8629; Enter</button>
+    <button class="mkey" onpointerdown="tap('Search')">&#8981; Search</button>
+  </div>
+  <p class="hint">Keystrokes stream as ECP <code>Lit_</code> events while the box is focused.</p>
+</div>
+
+<!-- Settings sheet -->
+<div class="scrim" id="scrim-g" onclick="closeSheets()"></div>
+<div class="sheet" id="sheet-settings">
+  <h3>Settings <span onclick="closeSheets()">Close</span></h3>
+  <label>Roku IP address</label>
+  <input id="ipbox" placeholder="192.168.1.x" inputmode="decimal">
+  <label>App buttons &mdash; one per line: <code>Label, appId, #color</code></label>
+  <textarea id="appsbox" spellcheck="false"></textarea>
+  <p class="hint">App IDs live at <code>http://&lt;ip&gt;:8060/query/apps</code>. Color optional.</p>
+  <button class="save" onclick="saveSettings()">Save</button>
+</div>
+
+<script>
+let IP = localStorage.getItem('roku_ip') || '';
+const DEFAULT_APPS = [
+  "NETFLIX, 12, #ffffff",
+  "Disney+, 291097, #113CCF",
+  "hulu, 2285, #1ce783",
+  "sling, 46041, #0a0a0a"
+];
+let APPS = JSON.parse(localStorage.getItem('roku_apps') || 'null') || DEFAULT_APPS;
+
+const APP_INK = {"12":"#E50914","2285":"#000","291097":"#fff"};
+
+function send(path){
+  if(!IP){ openSettings(); return; }
+  fetch(`http://${IP}:8060/${path}`, {method:'POST', mode:'no-cors'}).catch(()=>{});
+}
+function tap(key){ if(navigator.vibrate) navigator.vibrate(8); send('keypress/'+key); }
+function launch(id){ if(navigator.vibrate) navigator.vibrate(12); send('launch/'+id); }
+
+let pinging=false;
+async function ping(){
+  if(!IP || pinging) return; pinging=true;
+  const dot=document.getElementById('dot');
+  try{
+    const c=new AbortController(); const t=setTimeout(()=>c.abort(),1500);
+    await fetch(`http://${IP}:8060/query/device-info`,{mode:'no-cors',signal:c.signal});
+    clearTimeout(t); dot.className='dot on';
+  }catch(e){ dot.className='dot off'; }
+  pinging=false;
+}
+
+function bindRepeat(el){
+  const key=el.dataset.key; let to=null, iv=null;
+  const start=(e)=>{ e.preventDefault(); el.classList.add('act'); tap(key);
+    to=setTimeout(()=>{ iv=setInterval(()=>tap(key),110); },380); };
+  const stop=()=>{ el.classList.remove('act'); clearTimeout(to); clearInterval(iv); };
+  el.addEventListener('pointerdown',start);
+  el.addEventListener('pointerup',stop);
+  el.addEventListener('pointerleave',stop);
+  el.addEventListener('pointercancel',stop);
+}
+document.querySelectorAll('[data-key]').forEach(bindRepeat);
+
+function lum(hex){const m=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if(!m)return 0;return(0.299*parseInt(m[1],16)+0.587*parseInt(m[2],16)+0.114*parseInt(m[3],16))/255;}
+function renderApps(){
+  const wrap=document.getElementById('apps'); wrap.innerHTML='';
+  APPS.slice(0,4).forEach(line=>{
+    const [name,id,color]=line.split(',').map(s=>s.trim()); if(!id)return;
+    const b=document.createElement('button'); b.className='app';
+    const bg=color||'#222'; b.style.background=bg;
+    b.style.color = APP_INK[id] || (lum(bg)>0.6 ? '#0b0b0b' : '#fff');
+    b.textContent=name||id; b.onpointerdown=()=>launch(id);
+    wrap.appendChild(b);
+  });
+}
+
+function openSettings(){
+  document.getElementById('ipbox').value=IP;
+  document.getElementById('appsbox').value=APPS.join('\n');
+  document.getElementById('scrim-g').classList.add('show');
+  document.getElementById('sheet-settings').classList.add('show');
+}
+function saveSettings(){
+  IP=document.getElementById('ipbox').value.trim();
+  localStorage.setItem('roku_ip',IP);
+  APPS=document.getElementById('appsbox').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  localStorage.setItem('roku_apps',JSON.stringify(APPS));
+  renderApps(); setMeta(); closeSheets(); ping();
+}
+function openSearch(){
+  document.getElementById('scrim-s').classList.add('show');
+  document.getElementById('sheet-search').classList.add('show');
+  const b=document.getElementById('searchbox'); b.value=''; setTimeout(()=>b.focus(),250);
+}
+function closeSheets(){document.querySelectorAll('.scrim,.sheet').forEach(e=>e.classList.remove('show'));}
+
+const box=document.getElementById('searchbox');
+box.addEventListener('keydown',(e)=>{
+  if(e.key==='Backspace'){tap('Backspace');return;}
+  if(e.key==='Enter'){tap('Enter');e.preventDefault();return;}
+  if(e.key.length===1){send('keypress/Lit_'+encodeURIComponent(e.key));}
+});
+
+function setMeta(){document.title='Roku - '+(IP||'setup');}
+
+const KMAP={Escape:'Back',Home:'Home',Enter:'Select',Backspace:'Back','/':'InstantReplay','*':'Info',' ':'Play',
+  ArrowUp:'Up',ArrowDown:'Down',ArrowLeft:'Left',ArrowRight:'Right'};
+document.addEventListener('keydown',(e)=>{
+  if(document.activeElement===box)return;
+  if(KMAP[e.key]){tap(KMAP[e.key]);e.preventDefault();}
+});
+
+renderApps(); setMeta();
+if(!IP) openSettings();
+ping(); setInterval(ping,4000);
+</script>
+</body>
+</html>

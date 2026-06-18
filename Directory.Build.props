@@ -1,0 +1,14 @@
+<Project>
+  <!-- Redirect ALL build output OUT of the source tree to a 'build' drive-sibling (same drive as src →
+       no cross-drive dup-class). Keeps src/ pure source — bin/obj never appear under src/runspace.
+       BaseIntermediateOutputPath MUST be set here (Directory.Build.props), not in the .csproj — it's read
+       before obj/project.assets.json is located, so a csproj edit is too late. -->
+  <PropertyGroup>
+    <!-- Drive-agnostic, NO hardcoded path: $(SS_BUILD) override, else a 'build' sibling of the repo
+         (same drive as src -> no cross-drive dup-class). Normalized so the '..' resolves cleanly. -->
+    <SsBuild Condition="'$(SS_BUILD)' != ''">$(SS_BUILD)</SsBuild>
+    <SsBuild Condition="'$(SsBuild)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\build'))</SsBuild>
+    <BaseIntermediateOutputPath>$(SsBuild)\$(MSBuildProjectName)\obj\</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(SsBuild)\$(MSBuildProjectName)\bin\</BaseOutputPath>
+  </PropertyGroup>
+</Project>

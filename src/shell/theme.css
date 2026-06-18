@@ -1,0 +1,107 @@
+/* /theme.css — THE canonical CSS-var contract for the whole OS. ONE source of truth.
+ *
+ * Every surface (shell + every program iframe) consumes these vars and NOTHING else for color/glass.
+ * Hardcoding a color or a glass rgba anywhere is the drift bug — use a var. themes.js paints the
+ * active named theme onto :root at load; these are the safe defaults if themes.js hasn't run yet.
+ *
+ * Contract (do not rename; surfaces depend on these):
+ *   Color:  --bg --surface/--panel --fg/--text --muted --border/--line --accent --accent-2 --accent-fg
+ *   Glass:  --mica-rgb (the glass base, "r,g,b") --mica-opacity --mica-strong-opacity --mica-blur --bg-opacity
+ *   Global: --transparency (0..1 multiplier over glass opacity) · --font-mono --font-sans
+ */
+@font-face { font-family: 'CaskaydiaCove Nerd Font'; src: url('/assets/fonts/CascadiaCodeNF.ttf') format('truetype'); font-display: swap; }
+@font-face { font-family: 'Selawik';          src: url('/assets/fonts/selawk.ttf')          format('truetype'); font-display: swap; }
+:root {
+  /* --- color --- */
+  --bg:       #000000;
+  --surface:  #111111;
+  --panel:    #111111;                /* alias of --surface (shell uses --panel) */
+  --fg:       #f2f2f2;
+  --text:     #f2f2f2;                /* alias of --fg */
+  --muted:    #878787;
+  --accent:   #0084ff;                /* chrome accent — blue (SHELL-SPEC §6) */
+  --accent-2: #0078D4;                /* secondary highlight — defaults to solid blue (themes can re-tint; XP keeps magenta) */
+  --accent-fg:#ffffff;                /* text/icon on top of --accent */
+  --neon:     #22ff66;                /* the launch button "lights up" green — neon, functional (the
+                                         green twin of the red-X's red); themeable so it's registry-driven */
+  --neon-fg:  #04140a;                /* icon/text on top of --neon (dark — neon is bright) */
+  --success:  #10b981;                /* semantic success color (green) */
+  --error:    #ef4444;                /* semantic error color (red) */
+  --border:   rgba(255,255,255,0.10);
+  --line:     rgba(255,255,255,0.10); /* alias of --border */
+
+  /* --- glass (mica/acrylic) — drives EVERY .mica surface so themes can retune the material --- */
+  --mica-rgb:            12,12,12;     /* glass base color, "r,g,b" (no rgb() wrapper) */
+  --taskbar-rgb:         12,12,12;     /* the TASKBAR's own tint, "r,g,b" — atomic, independent of the
+                                          panel glass (98-2002 = blue bar). Defaults to --mica-rgb. */
+  --taskbar-fg:          #f2f2f2;      /* taskbar chip/text color (light, to read on a tinted bar). */
+  --mica-opacity:        0.55;         /* normal panel translucency */
+  --mica-strong-opacity: 0.90;         /* menus / dialogs (more opaque) */
+  --mica-blur:           28px;         /* backdrop blur radius — the one knob the data-mica rule reads */
+  --bg-opacity:          0.25;         /* stage tint over the wallpaper */
+  --mica-alpha:          100%;         /* presenter-surface opacity (a PERCENTAGE for color-mix);
+                                          themes.js drives it from the theme's micaOpacity — 100% = solid */
+  --mica-strong-alpha:   100%;         /* the floating-chrome (modal/menu/charm) opacity, the strong tier;
+                                          themes.js drives it from micaStrongOpacity — 100% = solid */
+
+  /* --- global --- */
+  --transparency: 1;                  /* 0..1 multiplier over glass opacity (themes.js drives it) */
+  --font-mono: 'CaskaydiaCove Nerd Font', ui-monospace, monospace;   /* CaskaydiaCove = the Nerd-Fonts patch of Cascadia Code; carries the Nerd glyphs */
+  --font-sans: 'Selawik', 'Segoe UI', system-ui, sans-serif;  /* UI body text */
+}
+
+/* Mica, the real material — themes.js sets data-mica on <html> (it runs in every presenter iframe,
+   so the storage-event re-skin carries the toggle everywhere). Chrome surfaces go translucent via
+   color-mix at --mica-alpha and pick up a pronounced backdrop blur. Degrade is free: where
+   backdrop-filter is unsupported the declaration is dropped and the color-mix translucency still
+   applies (plain translucency, no glass) — no branch. The blur radius is the registry-driven
+   --mica-blur so a theme can dial the whole material from one knob; saturate lifts the wallpaper
+   color through the glass the way real mica samples the desktop behind it.
+
+   System-wide: this is the ONE material rule and it covers the whole chrome vocabulary — presenter
+   containers (.surface/.app-layout), panels & side-panels, modals & dialogs, cards, and toolbars.
+   The taskbar and menu/flyout/charm surfaces tint themselves directly from --mica-rgb + --mica-blur
+   (Taskbar.css / Menu.css / Charms.css) so they're glass by construction; we reinforce the same blur
+   here for any that fall through to the generic class. Per-row blur stays off (a GPU bill on mobile);
+   we blur containers, not list items. */
+html[data-mica="on"] .surface,
+html[data-mica="on"] .app-layout,
+html[data-mica="on"] .panel,
+html[data-mica="on"] .side-panel,
+html[data-mica="on"] .modal,
+html[data-mica="on"] .card,
+html[data-mica="on"] .settings-card,
+html[data-mica="on"] .settings-section-card,
+html[data-mica="on"] .toolbar {
+  background: color-mix(in srgb, var(--surface) var(--mica-alpha), transparent);
+  -webkit-backdrop-filter: blur(var(--mica-blur)) saturate(1.4);
+  backdrop-filter: blur(var(--mica-blur)) saturate(1.4);
+}
+/* Modals, dialogs and menu/flyout chrome float ABOVE the stage, so they read better a touch more
+   opaque (the strong tier) — still glass, just less see-through than a docked panel. */
+html[data-mica="on"] .modal,
+html[data-mica="on"] .modal-veil > .modal,
+html[data-mica="on"] .menu-flyout,
+html[data-mica="on"] .charms-panel {
+  background: color-mix(in srgb, var(--surface) var(--mica-strong-alpha), transparent);
+  -webkit-backdrop-filter: blur(var(--mica-blur)) saturate(1.4);
+  backdrop-filter: blur(var(--mica-blur)) saturate(1.4);
+}
+
+/* Touch-first: no scrollbars anywhere (content still scrolls via swipe). */
+* { scrollbar-width: none; -ms-overflow-style: none; }
+*::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+/* OS input reset — we own input, the WebView is a presenter leaf. No text-selection, no long-press
+   callout, no tap highlight, no overscroll glow on chrome. (Mirrors the ui-final anti-web directives.)
+   Editable surfaces re-enable selection so the editor/terminal/inputs still work. */
+html, body {
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+input, textarea, [contenteditable="true"] {
+  -webkit-user-select: text; user-select: text;
+  -webkit-touch-callout: default;
+}

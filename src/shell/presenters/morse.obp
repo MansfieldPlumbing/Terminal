@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <base href="/">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Morse Chat</title>
+    <link rel="stylesheet" href="/theme.css">
+    <script src="/themes.js"></script>
+    <script src="/shell/presenter.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background: var(--bg); color: var(--fg);
+            font-family: var(--font-sans); overflow: hidden; font-size: 14px;
+            user-select: none; -webkit-user-select: none;
+        }
+        .app { display: flex; flex-direction: column; height: 100%; }
+        .header {
+            display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+            background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0;
+        }
+        .lamp {
+            width: 26px; height: 26px; border-radius: 50%;
+            background: var(--border); transition: background .08s, box-shadow .08s; flex-shrink: 0;
+        }
+        .lamp.on { background: #fff; box-shadow: 0 0 18px 4px color-mix(in srgb, var(--accent) 70%, #fff); }
+        .header-title { font-weight: 600; }
+        .header-sub { font-size: 12px; color: var(--muted); }
+        .role-pick { margin-left: auto; display: flex; gap: 6px; }
+        .role-btn {
+            border: 1px solid var(--border); background: transparent; color: var(--fg);
+            padding: 6px 12px; border-radius: 999px; cursor: pointer; font-size: 12px;
+        }
+        .role-btn.active { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+
+        .transcript { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+        .bubble { max-width: 80%; padding: 10px 14px; border-radius: 14px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
+        .bubble.me { align-self: flex-end; background: var(--accent); color: var(--accent-fg); border-bottom-right-radius: 4px; }
+        .bubble.them { align-self: flex-start; background: var(--surface); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+        .bubble.sys { align-self: center; background: transparent; color: var(--muted); font-size: 12px; max-width: 100%; text-align: center; }
+        .bubble .code { display: block; margin-top: 4px; font-family: var(--font-mono); font-size: 11px; opacity: .7; letter-spacing: 1px; }
+
+        .composer { display: flex; gap: 8px; padding: 12px 16px; background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; }
+        .composer input {
+            flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+            color: var(--fg); padding: 10px 12px; outline: none; font-size: 14px; font-family: var(--font-sans);
+        }
+        .composer input:focus { border-color: var(--accent); }
+        .btn {
+            border: none; border-radius: 10px; padding: 10px 16px; cursor: pointer; font-weight: 600; font-size: 13px;
+            background: var(--accent); color: var(--accent-fg);
+        }
+        .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--fg); }
+        .btn:disabled { opacity: .4; cursor: not-allowed; }
+        .ol1 { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); cursor: pointer; white-space: nowrap; }
+        .ol1 input { accent-color: var(--accent); margin: 0; }
+        .status { font-size: 12px; color: var(--muted); padding: 0 16px 10px; flex-shrink: 0; min-height: 18px; }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <div class="header">
+            <div class="lamp" id="lamp"></div>
+            <div>
+                <div class="header-title">Morse Chat</div>
+                <div class="header-sub" id="model-line">two Gemmas, over light</div>
+            </div>
+            <div class="role-pick">
+                <button class="role-btn active" id="role-auto" title="Auto: listen, reply, transmit, repeat">Auto</button>
+                <button class="role-btn" id="role-manual" title="Manual: you type, it flashes">Manual</button>
+            </div>
+        </div>
+
+        <div class="transcript" id="transcript"></div>
+        <div class="status" id="status"></div>
+
+        <div class="composer">
+            <input type="text" id="msg" placeholder="Type a line to flash…" autocomplete="off" spellcheck="false">
+            <label class="ol1" title="OL/1 handshake: CQ → K → payload → R"><input type="checkbox" id="ol1">OL/1</label>
+            <button class="btn" id="send">Flash</button>
+            <button class="btn ghost" id="listen">Listen</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { PsrpSession } from '/lib/psrp.js';
+
+        // The optical link rides an EXCLUSIVE PSRP session: this is stateful, serial device work
+        // (own the torch, own the light sensor, run a multi-second flash) — not the shared lane.
+        const psrp = new PsrpSession('morse');
+        const UNIT_MS = 200;
+
+        const elTranscript = document.getElementById('transcript');
+        const elStatus = document.getElementById('status');
+        const elMsg = document.getElementById('msg');
+        const elLamp = document.getElementById('lamp');
+        const elModelLine = document.getElementById('model-line');
+        const elOl1 = document.getElementById('ol1');
+        let mode = 'auto';   // 'auto' = Gemma converses; 'manual' = you type
+        let running = false; // a transmit or listen cycle is in flight
+
+        function bubble(cls, text, code) {
+            const b = document.createElement('div');
+            b.className = 'bubble ' + cls;
+            b.textContent = text;
+            if (code) { const c = document.createElement('span'); c.className = 'code'; c.textContent = code; b.appendChild(c); }
+            elTranscript.appendChild(b);
+            elTranscript.scrollTop = elTranscript.scrollHeight;
+            return b;
+        }
+        const status = (t) => { elStatus.textContent = t || ''; };
+
+        // Lamp animation: a watch-along echo of the flashing on screen (the real photons are the torch;
+        // this just lets a person see the rhythm). Best-effort, decorative.
+        function animateLamp(code, ms) {
+            let i = 0; const seq = [];
+            for (const ch of code) {
+                if (ch === '.') { seq.push([true, ms], [false, ms]); }
+                else if (ch === '-') { seq.push([true, ms * 3], [false, ms]); }
+                else if (ch === ' ') seq.push([false, ms * 2]);
+                else if (ch === '/') seq.push([false, ms * 4]);
+            }
+            let t = 0;
+            seq.forEach(([on, d]) => { setTimeout(() => elLamp.classList.toggle('on', on), t); t += d; });
+            setTimeout(() => elLamp.classList.remove('on'), t);
+        }
+
+        // --- backend verbs (the exclusive session runs them serially) ---
+        async function speak(text) { try { await psrp.run(`Out-Speech ${JSON.stringify(text)}`); } catch (e) {} }
+        async function flash(text) {
+            status('Flashing…');
+            if (elOl1.checked) {
+                // OL/1: acknowledged transfer — the cmdlet owns the hail/ack retries and timing.
+                const out = await psrp.run(`Send-Morse -Text ${JSON.stringify(text)} -UnitMs ${UNIT_MS} -Handshake | ConvertTo-Json -Compress`);
+                let ok = false; try { ok = !!JSON.parse(out).HandshakeOk; } catch (e) {}
+                status(ok ? 'Delivered (R received).' : 'No acknowledgment — is the peer listening in OL/1?');
+                return '';
+            }
+            const code = (await psrp.run(`Send-Morse -Text ${JSON.stringify(text)} -UnitMs ${UNIT_MS} -PassThru`)).trim();
+            animateLamp(code, UNIT_MS);
+            return code;
+        }
+        async function listen(sec = 14) {
+            status('Listening for light…');
+            if (elOl1.checked) {
+                // OL/1 listener (CQ → K → payload → R); the -Handshake default window is 120 s.
+                const out = await psrp.run(`Receive-Morse -UnitMs ${UNIT_MS} -Handshake | ConvertTo-Json -Compress`);
+                try { const r = JSON.parse(out); return r.HandshakeOk ? (r.Text || '').trim() : ''; } catch (e) { return ''; }
+            }
+            const out = await psrp.run(`Receive-Morse -TimeoutSec ${sec} -UnitMs ${UNIT_MS}`);
+            return out.trim();
+        }
+        // Broker generates the next line of conversation given the peer's last message.
+        async function think(heard) {
+            const prompt = heard
+                ? `You're chatting with another AI over flashlight Morse code. Keep it short — one friendly sentence, under 8 words, no punctuation that isn't a letter. They just said: "${heard}". Reply.`
+                : `You're starting a chat with another AI over flashlight Morse code. Say a short friendly greeting — under 8 words, letters only.`;
+            try {
+                const r = await psrp.run(`Invoke-Agent -AsText -Prompt ${JSON.stringify(prompt)}`);
+                return r.replace(/[^a-zA-Z0-9 ]/g, '').trim().slice(0, 60) || 'hello friend';
+            } catch (e) { return 'hello friend'; }
+        }
+
+        // --- the conversation loop (Auto): think → speak → flash → listen → repeat ---
+        async function autoTurn(heard) {
+            if (running) return; running = true;
+            try {
+                const line = await think(heard);
+                bubble('me', line, null);
+                await speak(line);
+                const code = await flash(line);
+                elTranscript.lastChild.querySelector('.code')?.remove();
+                bubble('sys', '', null).remove();
+                status('Listening for a reply…');
+                const reply = await listen();
+                if (reply) { bubble('them', reply); await speak(reply); status(''); autoTurn(reply); }
+                else { status('No reply heard — tap Listen to keep waiting, or Flash to send again.'); }
+            } finally { running = false; }
+        }
+
+        // --- manual: you type a line, it speaks + flashes; Listen decodes one incoming message ---
+        async function manualSend() {
+            const text = elMsg.value.trim(); if (!text || running) return;
+            elMsg.value = ''; running = true;
+            try { bubble('me', text); await speak(text); await flash(text); status('Sent.'); }
+            finally { running = false; }
+        }
+        async function manualListen() {
+            if (running) return; running = true;
+            try {
+                const reply = await listen();
+                if (reply) { bubble('them', reply); await speak(reply); status(''); }
+                else status('Nothing decoded — line up the lamps and try again.');
+            } finally { running = false; }
+        }
+
+        document.getElementById('send').onclick = () => mode === 'auto' ? autoTurn(null) : manualSend();
+        document.getElementById('listen').onclick = manualListen;
+        elMsg.onkeydown = (e) => { if (e.key === 'Enter') (mode === 'auto' ? autoTurn(null) : manualSend()); };
+
+        function setMode(m) {
+            mode = m;
+            document.getElementById('role-auto').classList.toggle('active', m === 'auto');
+            document.getElementById('role-manual').classList.toggle('active', m === 'manual');
+            document.getElementById('send').textContent = m === 'auto' ? 'Start chat' : 'Flash';
+            elMsg.style.display = m === 'auto' ? 'none' : '';
+        }
+        document.getElementById('role-auto').onclick = () => setMode('auto');
+        document.getElementById('role-manual').onclick = () => setMode('manual');
+
+        // Show which Gemma is loaded (telemetry → identity, not held here).
+        fetch('/diag', { cache: 'no-store' }).then(r => r.json()).then(d => {
+            const m = d.runtime || {};
+            if (m.activeModel) elModelLine.textContent = `${m.activeModel} · over light`;
+        }).catch(() => {});
+
+        if (window.Presenter) {
+            Presenter.menu('morse', [
+                { menu: 'file', verb: 'start', label: 'Start Chat' },
+                { menu: 'view', verb: 'listen', label: 'Listen Once' },
+            ]);
+            Presenter.onVerb((v) => { if (v === 'start') (mode === 'auto' ? autoTurn(null) : manualSend()); else if (v === 'listen') manualListen(); });
+        }
+        setMode('auto');
+        bubble('sys', 'Airplane mode + two phones, lamps facing each other. Press Start and let the Gemmas talk in light.');
+    </script>
+</body>
+</html>

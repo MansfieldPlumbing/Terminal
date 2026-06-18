@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <base href="/">
+    <link rel="stylesheet" href="/theme.css">
+    <script src="/themes.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Terminal</title>
+    <link rel="stylesheet" href="vendor/xterm/xterm.css" />
+    <style>
+        :root {
+            /* Color/accent come from /theme.css — never re-declare them here (that's the drift bug). */
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+        }
+        html { height: 100%; }
+        body {
+            margin: 0; padding: 0;
+            background: var(--bg);
+            color: var(--fg);
+            /* Fill the dynamic viewport edge-to-edge so no chrome color shows between the grid and the
+               taskbar (the white-bar bug). 100dvh tracks the live visible area as the IME/taskbar move;
+               100vh is the fallback for engines without dvh. */
+            height: 100vh; height: 100dvh; width: 100%;
+            overflow: hidden;
+            font-family: var(--font-sans);
+            display: flex; flex-direction: column;
+        }
+        /* Edge-to-edge: the terminal is its own surface — its background comes from the active xterm
+           scheme, and the body matches it so no chrome color leaks around the grid. The top inset keeps
+           the first rows clear of the notch/curve; the grid still paints to the very bottom edge. */
+        #terminal-container {
+            flex: 1 1 auto; width: 100%; height: 100%;
+            padding: var(--safe-top) 0 0 0; box-sizing: border-box;
+            min-height: 0;
+        }
+
+        /* The grid must own the full container height, or its own background stops short and the body
+           shows through as a strip above the taskbar (the white line). The viewport inherits the active
+           scheme's background so the fill reaches the bottom edge. */
+        .xterm { width: 100%; height: 100%; }
+        .xterm-viewport { background-color: transparent !important; }
+        .xterm-viewport::-webkit-scrollbar { width: 8px; }
+        .xterm-viewport::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        /* The browser may pan vertically; the capture-phase handlers below own the gesture either way. */
+        .xterm-screen, .xterm-text-layer, .xterm-rows { touch-action: pan-y !important; }
+    </style>
+</head>
+<body>
+    <div id="terminal-container"></div>
+
+    <script src="/shell/presenter.js"></script>
+    <script src="vendor/xterm/xterm.js"></script>
+    <script src="vendor/xterm/xterm-addon-fit.js"></script>
+    <script src="/schemes.js"></script>
+    <script type="module">
+        import { WebSocketClient } from '/lib/api.js';
+        import { PsrpSession } from '/lib/psrp.js';
+
+        // Parse tabId from URL, fallback to generating one
+        const urlParams = new URLSearchParams(window.location.search);
+        const tabId = urlParams.has('tabId') ? parseInt(urlParams.get('tabId')) : Date.now();
+
+        // --- Terminal ---
+        const cssVar = (n, d) => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || d;
+        const term = new Terminal({
+            cursorBlink: true,
+            // On focus loss xterm defaults to a hollow box ('outline') over the cell — visually loud on
+            // a phone. A thin bar is the subtle blurred-cursor cue the gripe asked for.
+            cursorInactiveStyle: 'bar',
+            // Pre-paint fallback only — schemes.js (registry-driven) repaints immediately below.
+            theme: { background: cssVar('--bg', '#000000'), foreground: cssVar('--fg', '#f2f2f2') },
+            fontFamily: cssVar('--font-mono', 'monospace'),
+            fontSize: 14,
+            scrollback: 5000,
+            allowTransparency: true,
+            allowProposedApi: true
+        });
+        window.fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(window.fitAddon);
+        term.open(document.getElementById('terminal-container'));
+        term.focus();
+
+        // Apply the active terminal color scheme (schemes.js); live-update when it changes.
+        function applyTermScheme() {
+            if (!window.Schemes) return;
+            const t = window.Schemes.toXterm(window.Schemes.active('terminal'));
+            if (t) term.options.theme = t;
+        }
+        applyTermScheme();
+        if (window.Schemes) window.Schemes.onChange(applyTermScheme);
+
+        // --- TOUCH OWNERSHIP: a vertical pan scrolls the buffer no matter what the finger lands on.
+        // xterm's selection layer used to claim touches over rendered text, swallowing the pan (you
+        // couldn't scroll up if text was under your finger). Capture-phase handlers on the container
+        // see the gesture FIRST: past a small slop we take it (stopPropagation + manual scrollLines)
+        // so selection never engages; a tap (< slop) passes through untouched for focus/IME. ---
+        (function ownTouchScroll(container) {
+            let startY = null, lastY = 0, panning = false;
+            const SLOP = 12;   // px before we claim the gesture
+            container.addEventListener('touchstart', (e) => {
+                if (e.touches.length !== 1) { startY = null; return; }
+                startY = lastY = e.touches[0].clientY;
+                panning = false;
+            }, { capture: true, passive: true });
+            container.addEventListener('touchmove', (e) => {
+                if (startY === null || e.touches.length !== 1) return;
+                const y = e.touches[0].clientY;
+                if (!panning && Math.abs(y - startY) > SLOP) {
+                    panning = true;
+                    try { term.clearSelection(); } catch (err) {}
+                }
+                if (!panning) return;
+                e.stopPropagation();
+                e.preventDefault();
+                const cell = term._core?._renderService?.dimensions?.actualCellHeight || 18;
+                const dRows = Math.trunc((lastY - y) / cell);
+                if (dRows !== 0) { term.scrollLines(dRows); lastY = y - ((lastY - y) % cell); }
+            }, { capture: true, passive: false });
+            const end = (e) => {
+                if (panning) e.stopPropagation();
+                startY = null; panning = false;
+            };
+            container.addEventListener('touchend', end, { capture: true });
+            container.addEventListener('touchcancel', end, { capture: true });
+        })(document.getElementById('terminal-container'));
+
+        // --- GBOARD BUFFER TOGGLE ---
+        // Gboard's composing buffer (swipe + autocomplete) is great for prose, wrong for a shell where
+        // every keystroke must land verbatim. Default ON (buffer kept). The password-field/no-buffer
+        // hack is opt-in via a LABELED long-press toggle so it is discoverable, not a silent override.
+        let gboardBuffer = true;   // true = composing buffer kept; false = suppressed (verbatim keys)
+        function applyGboardBuffer() {
+            const textarea = document.querySelector('.xterm-helper-textarea');
+            if (!textarea) return;
+            // A terminal never wants auto-capitalize or red-squiggle in either mode.
+            textarea.setAttribute('autocapitalize', 'off');
+            textarea.setAttribute('spellcheck', 'false');
+            if (gboardBuffer) {
+                // Buffer kept: no inputmode/password overrides (those suppress the composing buffer/swipe).
+                textarea.removeAttribute('inputmode');
+                textarea.removeAttribute('type');
+                textarea.setAttribute('autocomplete', 'off');
+            } else {
+                // Buffer suppressed: the password-input hack disables Gboard's buffer/autocomplete so
+                // keys arrive one-for-one (no swipe candidates eating control chars).
+                textarea.setAttribute('inputmode', 'text');
+                textarea.setAttribute('type', 'password');
+                textarea.setAttribute('autocomplete', 'off');
+            }
+        }
+
+        setTimeout(() => {
+            window.fitAddon.fit();
+            applyGboardBuffer();
+        }, 50);
+
+        // Long-press the terminal to flip the buffer, with a clearly labeled toast of the new state.
+        (function gboardLongPress(container) {
+            let timer = null;
+            const LONG_MS = 550;
+            const arm = (e) => {
+                if (e.touches && e.touches.length !== 1) return;
+                clearTimeout(timer);
+                timer = setTimeout(() => {
+                    gboardBuffer = !gboardBuffer;
+                    applyGboardBuffer();
+                    term.write('\x1b[33mGboard buffer: ' + (gboardBuffer ? 'on' : 'off') + '\x1b[0m\r\n');
+                    publishMenu();
+                }, LONG_MS);
+            };
+            const disarm = () => { clearTimeout(timer); timer = null; };
+            container.addEventListener('touchstart', arm, { capture: true, passive: true });
+            container.addEventListener('touchend', disarm, { capture: true });
+            container.addEventListener('touchcancel', disarm, { capture: true });
+            // A pan (the scroll handler claims it) should not also fire the long-press.
+            container.addEventListener('touchmove', disarm, { capture: true, passive: true });
+        })(document.getElementById('terminal-container'));
+
+        window.addEventListener('resize', () => window.fitAddon.fit());
+
+        // --- Backend lanes: the LOCAL repl (the in-proc runspace over the /terminal WS) and an
+        // optional PSRP session (an exclusive remote runspace over the Subsystem.Psrp pipe — Rs).
+        // The PSRP session holds the pipe exclusively while open, and is line-oriented: this
+        // presenter does the line editing, the session runs the script. Toggle: Tools → PSRP Session. ---
+        let mode = 'local';                       // 'local' | 'psrp'
+        let psrp = null;                          // exclusive PsrpSession when mode === 'psrp'
+        let lineBuf = '';
+
+        const ws = new WebSocketClient('/terminal', {
+            onOpen: () => ws.send(JSON.stringify({ type: 'createSession', tabId })),
+            onMessage: (data) => {
+                if (mode !== 'local' || typeof data !== 'string') return;
+                const idx = data.indexOf(':');
+                if (idx > -1 && parseInt(data.substring(0, idx)) === tabId) {
+                    term.write(data.substring(idx + 1));
+                }
+            },
+        });
+        ws.connect();
+
+        const PSRP_PROMPT = '\x1b[36mPS psrp>\x1b[0m ';
+
+        async function runPsrpLine() {
+            const script = lineBuf;
+            lineBuf = '';
+            term.write('\r\n');
+            if (!script.trim()) { term.write(PSRP_PROMPT); return; }
+            try {
+                const text = await psrp.run(script);
+                if (text) term.write(text.replace(/\r?\n/g, '\r\n') + '\r\n');
+            } catch (err) {
+                term.write('\x1b[31m' + String(err.message || err) + '\x1b[0m\r\n');
+            }
+            term.write(PSRP_PROMPT);
+        }
+
+        function feedPsrpEditor(data) {
+            for (const ch of data) {
+                if (ch === '\r' || ch === '\n') { runPsrpLine(); }
+                else if (ch === '\x7f' || ch === '\b') {
+                    if (lineBuf.length) { lineBuf = lineBuf.slice(0, -1); term.write('\b \b'); }
+                }
+                else if (ch === '\x03') { lineBuf = ''; term.write('^C\r\n' + PSRP_PROMPT); }
+                else if (ch >= ' ') { lineBuf += ch; term.write(ch); }
+            }
+        }
+
+        term.onData(data => {
+            if (mode === 'local') {
+                ws.send(JSON.stringify({ type: 'text', tabId, text: data }));
+            } else {
+                feedPsrpEditor(data);
+            }
+        });
+
+        term.onResize(({ cols, rows }) => {
+            if (mode === 'local') ws.send(JSON.stringify({ type: 'resize', tabId, cols, rows }));
+        });
+
+        async function setMode(next) {
+            if (next === mode) return;
+            if (next === 'psrp') {
+                try {
+                    psrp = new PsrpSession('terminal-' + tabId);
+                    await psrp.open();
+                    mode = 'psrp';
+                    term.write('\r\n\x1b[36m[PSRP]\x1b[0m remote runspace over \x1b[1mSubsystem.Psrp\x1b[0m — ' +
+                               'exclusive while open (shared-lane file ops queue behind it).\r\n');
+                    term.write(PSRP_PROMPT);
+                } catch (err) {
+                    term.write('\r\n\x1b[31mPSRP session failed: ' + String(err.message || err) + '\x1b[0m\r\n');
+                    psrp = null;
+                }
+            } else {
+                try { if (psrp) psrp.close(); } catch (e) {}
+                psrp = null;
+                lineBuf = '';
+                mode = 'local';
+                term.write('\r\n\x1b[36m[local]\x1b[0m back on the in-proc runspace.\r\n');
+            }
+            publishMenu();
+        }
+
+        // Conformance (REGISTRY-SPEC §6/§8): contribute verbs; the Shell's Menu/Charms present them.
+        function publishMenu() {
+            if (!window.Presenter) return;
+            Presenter.menu('terminal', [
+                { menu: 'edit', verb: 'copy',  label: 'Copy' },
+                { menu: 'edit', verb: 'paste', label: 'Paste' },
+                { menu: 'view', verb: 'clear', label: 'Clear Output' },
+                { menu: 'tools', verb: 'psrp', label: 'PSRP Session', checked: mode === 'psrp' },
+                { menu: 'tools', verb: 'gboard', label: 'Gboard buffer: ' + (gboardBuffer ? 'on' : 'off'), checked: gboardBuffer },
+            ]);
+        }
+        if (window.Presenter) Presenter.onVerb((v) => {
+            if (v === 'clear') term.clear();
+            else if (v === 'psrp') setMode(mode === 'psrp' ? 'local' : 'psrp');
+            else if (v === 'gboard') {
+                gboardBuffer = !gboardBuffer;
+                applyGboardBuffer();
+                term.write('\x1b[33mGboard buffer: ' + (gboardBuffer ? 'on' : 'off') + '\x1b[0m\r\n');
+                publishMenu();
+            }
+            else if (v === 'copy') { try { navigator.clipboard.writeText(term.getSelection() || ''); } catch (e) {} }
+            else if (v === 'paste') {
+                try { navigator.clipboard.readText().then((t) => {
+                    if (!t) return;
+                    if (mode === 'local') ws.send(JSON.stringify({ type: 'text', tabId, text: t }));
+                    else feedPsrpEditor(t);
+                }); } catch (e) {}
+            }
+        });
+        publishMenu();
+    </script>
+</body>
+</html>

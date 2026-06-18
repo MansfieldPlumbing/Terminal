@@ -1,0 +1,1894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <base href="/">
+    <link rel="stylesheet" href="/theme.css">
+    <script src="/themes.js"></script>
+    <title>Task Manager (Vanilla)</title>
+
+
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            background-color: var(--bg);
+            color: var(--fg);
+            font-family: var(--font-sans);
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+            font-size: 0.875rem; /* text-sm */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar { width: 14px; height: 14px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb {
+            background-color: var(--border);
+            border: 4px solid var(--bg);
+            border-radius: 8px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background-color: var(--muted);
+        }
+        ::-webkit-scrollbar-corner { background: transparent; }
+        
+        .mask-fade-edges {
+            -webkit-mask-image: linear-gradient(to right, transparent 0%, black 16px, black calc(100% - 16px), transparent 100%);
+            mask-image: linear-gradient(to right, transparent 0%, black 16px, black calc(100% - 16px), transparent 100%);
+        }
+
+        /* Layout & Flex */
+        .app-layout {
+            display: flex;
+            flex-direction: row;
+            height: 100vh;
+            width: 100%;
+            background-color: var(--surface);
+        }
+        .main-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .flex-row { flex-direction: row; }
+        .flex-1 { flex: 1 1 0%; }
+        .shrink-0 { flex-shrink: 0; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .justify-start { justify-content: flex-start; }
+        .gap-1 { gap: 0.25rem; }
+        .gap-2 { gap: 0.5rem; }
+        .gap-3 { gap: 0.75rem; }
+        .gap-4 { gap: 1rem; }
+        .hidden { display: none !important; }
+        .relative { position: relative; }
+        .absolute { position: absolute; }
+        .sticky { position: sticky; }
+        .top-0 { top: 0; }
+        .z-10 { z-index: 10; }
+        .z-20 { z-index: 20; }
+        .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .text-xs { font-size: 0.75rem; }
+        .text-sm { font-size: 0.875rem; }
+        .text-lg { font-size: 1.125rem; }
+        .text-xl { font-size: 1.25rem; }
+        .text-3xl { font-size: 1.875rem; }
+        .font-light { font-weight: 300; }
+        .font-medium { font-weight: 500; }
+        .font-semibold { font-weight: 600; }
+        .font-bold { font-weight: 700; }
+        .font-mono { font-family: var(--font-mono), monospace; }
+        .uppercase { text-transform: uppercase; }
+        .capitalize { text-transform: capitalize; }
+        .transition-colors { transition-property: color, background-color, border-color; transition-duration: 150ms; }
+
+        /* Sidebar Navigation */
+        #sidebar {
+            width: 3rem; /* w-12 */
+            background-color: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            transition: width 200ms;
+            padding-top: 0.5rem;
+            z-index: 20;
+            flex-shrink: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+        #sidebar.expanded {
+            width: 16rem; /* w-64 */
+        }
+        /* Hover-expand is a pointer-only affordance: on touch, :hover latches on tap and wedges the
+           sidebar open — so every hover-expand rule lives behind (hover: hover). */
+        @media (hover: hover) {
+            #sidebar:hover {
+                width: 16rem; /* w-64 */
+            }
+        }
+        .sidebar-toggle-container {
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
+            padding-bottom: 1rem;
+        }
+        #sidebar-toggle {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            height: 2.5rem;
+            padding-left: 0.5rem;
+            border-radius: 0.25rem;
+            background: transparent;
+            border: none;
+            color: var(--fg);
+            cursor: pointer;
+            transition: background-color 150ms;
+        }
+        #sidebar-toggle:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        #sidebar-tabs {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
+        }
+        .sidebar-tab-btn {
+            width: 100%;
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            height: 2.5rem;
+            padding-left: 0.5rem;
+            border-radius: 0.25rem;
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--fg);
+            cursor: pointer;
+            text-align: left;
+            transition: background-color 150ms;
+        }
+        .sidebar-tab-btn:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        .sidebar-tab-btn.active {
+            background-color: rgba(255, 255, 255, 0.08);
+        }
+        .sidebar-tab-btn span {
+            opacity: 0;
+            transition: opacity 200ms;
+            white-space: nowrap;
+            font-size: 0.875rem;
+            font-weight: 500;
+            padding-right: 0.5rem;
+        }
+        #sidebar.expanded .sidebar-tab-btn span {
+            opacity: 1;
+        }
+        @media (hover: hover) {
+            #sidebar:hover .sidebar-tab-btn span {
+                opacity: 1;
+            }
+        }
+        .sidebar-accent-indicator {
+            position: absolute;
+            left: 0;
+            width: 3px;
+            height: 1rem;
+            background-color: var(--accent);
+            border-radius: 0 4px 4px 0;
+            display: none;
+        }
+        .sidebar-tab-btn.active .sidebar-accent-indicator {
+            display: block;
+        }
+
+        /* Header */
+        #header {
+            height: 4rem; /* h-16 */
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-left: 1.5rem;
+            padding-right: 1.5rem;
+            background-color: var(--surface);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+        #header-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .header-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
+            height: 2rem;
+            font-size: 0.875rem;
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--fg);
+            border-radius: 0.375rem;
+            cursor: pointer;
+            transition: background-color 150ms, color 150ms;
+        }
+        .header-btn:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        .header-btn.accent {
+            color: var(--accent);
+        }
+        .header-btn.danger {
+            color: #ef4444;
+        }
+        .header-btn.danger:hover {
+            color: #f87171;
+            background-color: rgba(239, 68, 68, 0.05);
+        }
+        .header-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .icon-btn {
+            width: 2rem;
+            height: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.375rem;
+            background: transparent;
+            border: none;
+            color: var(--fg);
+            cursor: pointer;
+            transition: background-color 150ms;
+        }
+        .icon-btn:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Elevation Banner */
+        #elevation-banner {
+            background-color: rgba(245, 158, 11, 0.2);
+            border-bottom: 1px solid rgba(245, 158, 11, 0.5);
+            padding: 0.5rem;
+            color: #fef3c7;
+            text-align: center;
+            font-size: 0.75rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        /* Viewport & Tables */
+        #tab-viewport {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        .table-container {
+            flex: 1;
+            overflow: auto;
+            background-color: var(--surface);
+            font-size: 0.875rem;
+        }
+        table {
+            width: 100%;
+            text-align: left;
+            border-collapse: collapse;
+            user-select: none;
+            white-space: nowrap;
+        }
+        thead {
+            position: sticky;
+            top: 0;
+            background-color: var(--surface);
+            box-shadow: 0 1px 0 0 var(--border);
+            z-index: 10;
+            font-size: 0.75rem;
+            color: var(--fg);
+        }
+        th {
+            font-weight: 400;
+            padding: 0.5rem;
+            border-right: 1px solid var(--border);
+            cursor: pointer;
+            transition: background-color 150ms;
+        }
+        th:hover {
+            background-color: rgba(255, 255, 255, 0.03);
+        }
+        th.active-header {
+            border-bottom: 2px solid var(--accent);
+            background-color: var(--surface);
+        }
+        tr.process-row, tr.details-row, tr.startup-row {
+            height: 2rem;
+            border-bottom: 1px solid transparent;
+            cursor: pointer;
+            transition: background-color 150ms;
+        }
+        tr.process-row:hover, tr.details-row:hover, tr.startup-row:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        tr.process-row.selected, tr.details-row.selected, tr.startup-row.selected {
+            background-color: rgba(255, 255, 255, 0.08) !important;
+        }
+        td {
+            padding: 0.25rem 0.5rem;
+            vertical-align: middle;
+        }
+        .toggle-btn {
+            width: 1rem;
+            height: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        /* Services & Startup Filters */
+        .filters-header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+        .search-container {
+            display: flex;
+            align-items: center;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 0.25rem;
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
+            width: 16rem;
+            height: 2rem;
+            transition: border-color 0.15s;
+        }
+        .search-container:focus-within {
+            border-color: var(--accent);
+        }
+        .search-container input {
+            background: transparent;
+            border: none;
+            outline: none;
+            font-size: 0.875rem;
+            padding-left: 0.5rem;
+            width: 100%;
+            color: var(--fg);
+        }
+        .search-container input::placeholder {
+            color: var(--muted);
+        }
+        .filter-select {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 0.25rem;
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
+            height: 2rem;
+            outline: none;
+            color: var(--fg);
+            font-size: 0.875rem;
+            transition: border-color 0.15s;
+        }
+        .filter-select:focus {
+            border-color: var(--accent);
+        }
+
+        /* Services Split Layout & Side Panel */
+        .split-layout {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+        .side-panel {
+            width: 18rem;
+            background-color: var(--surface);
+            border-left: 1px solid var(--border);
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            height: 100%;
+            padding: 1rem;
+        }
+        
+        /* Badges & Indicators */
+        .badge {
+            padding: 0.125rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: capitalize;
+        }
+        .badge.high { color: #f87171; }
+        .badge.medium { color: #fbbf24; }
+        .badge.low { color: #34d399; }
+        
+        .badge-toggle {
+            padding: 0.125rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+        }
+        .badge-toggle.on {
+            background-color: var(--accent);
+            color: var(--accent-fg);
+        }
+        .badge-toggle.off {
+            background-color: var(--border);
+            color: var(--fg);
+        }
+
+        /* Settings view styles */
+        .settings-content-wrapper {
+            max-width: 56rem;
+            margin-left: auto;
+            margin-right: auto;
+            padding-left: 1rem;
+            padding-right: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            overflow-y: auto;
+            height: 100%;
+            padding-bottom: 8rem;
+        }
+        .settings-section-card {
+            background-color: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .settings-card-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .settings-card-header h3 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--fg);
+            margin: 0;
+        }
+        .settings-row {
+            padding: 1.25rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .settings-row.border-b {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .settings-row-label {
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--fg);
+        }
+        .settings-row-desc {
+            font-size: 0.75rem;
+            color: var(--muted);
+            margin-top: 0.25rem;
+        }
+        .settings-checkbox, .settings-radio-btn {
+            width: 1.25rem;
+            height: 1.25rem;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+        
+        /* Context Menu */
+        #context-menu {
+            position: fixed;
+            background-color: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 0.375rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            padding-top: 0.25rem;
+            padding-bottom: 0.25rem;
+            z-index: 50;
+            min-width: 200px;
+        }
+        .context-item {
+            background: transparent;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            width: 100%;
+            text-align: left;
+            padding: 0.375rem 1rem;
+            font-size: 13px;
+            color: var(--fg);
+            cursor: pointer;
+        }
+        .context-item:hover:not(:disabled) {
+            background-color: rgba(255, 255, 255, 0.08);
+        }
+        .context-item:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+    </style>
+  <script src="/shell/presenter.js"></script>
+  <style>
+    /* NF glyph icons — CaskaydiaCove NF via --font-mono; no icon library. */
+    .nf { font-family: var(--font-mono); font-style: normal; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+  </style>
+  <script>
+    // Icon shim: the markup keeps its inert data-lucide markers; this renders them as Nerd Font
+    // glyphs from the themed mono font (ASCII-safe escapes). The icon library is GONE.
+    (function () {
+      var NF = {
+        'menu': '\uf0c9',
+        'play-square': '\uf04b',
+        'stop-circle': '\uf28d',
+        'more-horizontal': '\uf141',
+        'refresh-cw': '\uf021',
+        'search': '\uf002',
+        'chevron-down': '\uf078',
+        'chevron-right': '\uf054',
+        'leaf': '\uf06c',
+        'gauge': '\uf0e4',
+        'box': '\uf1b2',
+        'layout-grid': '\uf00a',
+        'activity': '\uf201',
+        'list': '\uf03a',
+        'layers': '\uf1b3',
+        'server': '\uf233',
+        'rocket': '\uf135',
+        'settings': '\uf013',
+        'help-circle': '\uf059',
+        'x': '\uf00d',
+        'info': '\uf05a'
+      };
+      window.lucide = { createIcons: function (opts) {
+        var root = (opts && opts.root) || document;
+        root.querySelectorAll('i[data-lucide]').forEach(function (el) {
+          var s = document.createElement('span');
+          s.className = ('nf ' + (el.className || '')).trim();
+          var st = el.getAttribute('style'); if (st) s.setAttribute('style', st);
+          s.textContent = NF[el.getAttribute('data-lucide')] || '\uf128';
+          el.replaceWith(s);
+        });
+      } };
+    })();
+  </script>
+</head>
+<body class="app-layout">
+    <!-- Sidebar Navigation -->
+    <div id="sidebar" class="expanded">
+        <div class="sidebar-toggle-container">
+            <button id="sidebar-toggle">
+                <i data-lucide="menu"></i>
+            </button>
+        </div>
+        <div id="sidebar-tabs">
+            <!-- Tabs injected dynamically -->
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="main-container">
+        <!-- Header -->
+        <div id="header">
+            <h1 id="header-title" class="text-xl font-semibold">Processes</h1>
+            <div id="header-actions">
+                <button id="btn-run-task" class="header-btn accent">
+                    <i data-lucide="play-square"></i>
+                    <span>Run new task</span>
+                </button>
+                <button id="btn-end-task" class="header-btn danger" disabled>
+                    <i data-lucide="stop-circle"></i>
+                    <span>End task</span>
+                </button>
+                <button class="icon-btn">
+                    <i data-lucide="more-horizontal"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Notification Banner if not Pair Elevated -->
+        <div id="elevation-banner" class="hidden">
+            Pair device for full process list
+        </div>
+
+        <!-- Dynamic Main Scrollable Tab Contents -->
+        <div id="tab-viewport">
+            <!-- Content will be injected dynamically -->
+        </div>
+    </div>
+
+    <!-- Right-click Generic Context Menu -->
+    <div id="context-menu" class="hidden">
+        <!-- Items dynamically populated -->
+    </div>
+
+    <!-- Application Engine Logic -->
+    <script type="module">
+        import { executeCommand } from '/lib/api.js';
+
+        // Core data lists
+        let services = [];
+        let startupApps = [];
+        let threads = [];
+
+        // Global Configurations (matching Settings)
+        let settingsStore = {
+            defaultPage: 'processes',
+            updateSpeed: 'normal',
+            alwaysOnTop: false,
+            minimizeOnUse: false,
+            hideWhenMinimized: false
+        };
+
+        const TAB_TITLES = {
+            processes: 'Processes',
+            performance: 'Performance',
+            details: 'Details',
+            threads: 'Threads',
+            services: 'Services',
+            startup: 'Startup apps',
+            settings: 'Settings'
+        };
+
+        const SIDEBAR_TABS = [
+            { id: 'processes', label: 'Processes', icon: 'layout-grid' },
+            { id: 'performance', label: 'Performance', icon: 'activity' },
+            { id: 'details', label: 'Details', icon: 'list' },
+            { id: 'threads', label: 'Threads', icon: 'layers' },
+            { id: 'services', label: 'Services', icon: 'server' },
+            { id: 'startup', label: 'Startup apps', icon: 'rocket' },
+            { id: 'settings', label: 'Settings', icon: 'settings' }
+        ];
+
+        let activeTab = 'processes';
+        let isExpanded = true;
+        let isElevated = true; // Pair elevated
+        let selectedRowId = null;
+        let selectedPerfMetricId = 'mem';
+        let expandedRows = new Set(); // Stores expanded row ID string keys
+        let parsedProcesses = []; // Current storage of processed items
+        let processFlatList = []; // Flattened version of current process list (for details mapping)
+
+        // Performance history (60 samples per metric) — filled ONLY by the state texture; no
+        // fabricated seed values. Keys mirror PERF_METRICS ids.
+        let historicPerfBuffer = {
+            mem: [],
+            vomHandles: [],
+            vomMb: [],
+            sessions: [],
+            registry: [],
+        };
+
+        // Initialize App UI
+        function initApp() {
+            renderSidebar();
+            switchTab(settingsStore.defaultPage || 'processes');
+            
+            // Global click listeners to close contextual windows
+            document.addEventListener('click', () => {
+                hideContextMenu();
+            });
+
+            // Toggle sidebar expand/collapse — a true open<->close toggle (hover-expand is scoped to
+            // (hover: hover) devices in CSS, so on touch this button is the only affordance).
+            const sidebar = document.getElementById('sidebar');
+            // Portrait / narrow viewports start collapsed — the table is the priority surface there.
+            if (matchMedia('(orientation: portrait)').matches || window.innerWidth < 700) {
+                sidebar.classList.remove('expanded');
+                isExpanded = false;
+            }
+            document.getElementById('sidebar-toggle').onclick = (e) => {
+                e.stopPropagation();
+                sidebar.classList.toggle('expanded');
+                isExpanded = sidebar.classList.contains('expanded');
+            };
+
+            // Refresh Loops
+            triggerDataPollingLoop();
+
+            // Setup Header End Task handler
+            document.getElementById('btn-end-task').onclick = async () => {
+                if (selectedRowId) {
+                    await handleEndTask(selectedRowId);
+                }
+            };
+
+            // Setup Run New Task handler
+            document.getElementById('btn-run-task').onclick = () => {
+                const name = prompt("Enter the name of the executable / package to run:");
+                if (name && name.trim()) {
+                    alert(`Starting task: ${name.trim()}`);
+                }
+            };
+        }
+
+        // Render Sidebar Menu dynamically
+        function renderSidebar() {
+            const container = document.getElementById('sidebar-tabs');
+            container.innerHTML = SIDEBAR_TABS.map(tab => {
+                return `
+                    <button id="sidebar-tab-${tab.id}" class="sidebar-tab-btn">
+                        <div id="accent-indicator-${tab.id}" class="sidebar-accent-indicator"></div>
+                        <i data-lucide="${tab.icon}"></i>
+                        <span>${tab.label}</span>
+                    </button>
+                `;
+            }).join('');
+
+            // Bind click behaviors to sidebar tabs
+            SIDEBAR_TABS.forEach(tab => {
+                document.getElementById(`sidebar-tab-${tab.id}`).onclick = (e) => {
+                    e.stopPropagation();
+                    switchTab(tab.id);
+                };
+            });
+
+            lucide.createIcons();
+        }
+
+        // Switch application tab sheets
+        function switchTab(tabId) {
+            activeTab = tabId;
+            selectedRowId = null;
+            const btnEnd = document.getElementById('btn-end-task');
+            if (btnEnd) btnEnd.disabled = true;
+
+            // Highlight Tab Button
+            SIDEBAR_TABS.forEach(tab => {
+                const btn = document.getElementById(`sidebar-tab-${tab.id}`);
+                const acc = document.getElementById(`accent-indicator-${tab.id}`);
+                if (btn && acc) {
+                    if (tab.id === tabId) {
+                        btn.classList.add('active');
+                        acc.style.display = 'block';
+                    } else {
+                        btn.classList.remove('active');
+                        acc.style.display = 'none';
+                    }
+                }
+            });
+
+            // Adjust Header visibility
+            const header = document.getElementById('header');
+            const hTitle = document.getElementById('header-title');
+
+            if (header) {
+                if (tabId === 'settings') {
+                    header.classList.add('hidden');
+                } else {
+                    header.classList.remove('hidden');
+                    if (hTitle) hTitle.textContent = TAB_TITLES[tabId];
+                    
+                    if (btnEnd) {
+                        if (tabId === 'processes' || tabId === 'details') {
+                            btnEnd.style.display = 'flex';
+                        } else {
+                            btnEnd.style.display = 'none';
+                        }
+                    }
+                }
+            }
+
+            // Render matching sub-view template
+            renderActiveTabContent();
+        }
+
+        // Render contents inside the primary viewport
+        function renderActiveTabContent() {
+            const viewport = document.getElementById('tab-viewport');
+            if (!viewport) return;
+            viewport.innerHTML = '';
+
+            if (activeTab === 'processes') {
+                viewport.innerHTML = `
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 40%">Name</th>
+                                    <th style="width: 12%; text-align: right;">
+                                        <div class="flex flex-col">
+                                            <span id="proc-cpu-agg">0%</span>
+                                            <span>CPU</span>
+                                        </div>
+                                    </th>
+                                    <th style="width: 8%; text-align: center;">Status</th>
+                                    <th class="active-header" style="width: 15%; text-align: right;">
+                                        <div class="flex flex-col">
+                                            <span id="proc-mem-agg">0 MB</span>
+                                            <span>Memory</span>
+                                        </div>
+                                    </th>
+                                    <th style="width: 12%; text-align: right;">
+                                        <div class="flex flex-col">
+                                            <span>0 MB/s</span>
+                                            <span>Disk</span>
+                                        </div>
+                                    </th>
+                                    <th style="width: 12%; text-align: right;">
+                                        <div class="flex flex-col">
+                                            <span>0 Mbps</span>
+                                            <span>Network</span>
+                                        </div>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody id="processes-tbody">
+                                <tr><td colSpan="6" class="text-center py-8" style="color: var(--muted); padding: 2rem;">Loading processes...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                buildProcessesTable();
+            } 
+            else if (activeTab === 'details') {
+                viewport.innerHTML = `
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 25%">Name</th>
+                                    <th>PID</th>
+                                    <th>Status</th>
+                                    <th>User name</th>
+                                    <th style="text-align: right;">CPU</th>
+                                    <th style="text-align: right;">Memory (active private)</th>
+                                    <th>Architecture</th>
+                                </tr>
+                            </thead>
+                            <tbody id="details-tbody">
+                                <tr><td colSpan="7" class="text-center" style="color: var(--muted); padding: 2rem;">Loading process details...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                buildDetailsTable();
+            } 
+            else if (activeTab === 'threads') {
+                viewport.innerHTML = `
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 40%">Name</th>
+                                    <th style="width: 20%">Owner</th>
+                                    <th style="width: 15%; text-align: center;">Type</th>
+                                    <th style="width: 15%; text-align: center;">Status</th>
+                                    <th style="text-align: right; min-width: 70px;">Memory</th>
+                                </tr>
+                            </thead>
+                            <tbody id="threads-tbody">
+                                <tr><td colSpan="5" class="text-center" style="color: var(--muted); padding: 2rem;">Loading live threads...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                buildThreadsTable();
+            } 
+            else if (activeTab === 'performance') {
+                viewport.innerHTML = `
+                    <div class="split-layout">
+                        <!-- Metric Select sidebar -->
+                        <div id="perf-metrics-container" style="width: 18rem; display: flex; flex-direction: column; border-right: 1px solid var(--border); overflow-y: auto; padding-top: 0.5rem; padding-bottom: 0.5rem; flex-shrink: 0;">
+                            <!-- Metrics items dynamically loaded -->
+                        </div>
+                        <!-- Canvas Rollers page -->
+                        <div id="perf-chart-container" style="flex: 1; overflow-y: auto; padding: 1.5rem; transition: all 150ms;">
+                            <!-- Injected dynamically -->
+                        </div>
+                    </div>
+                `;
+                renderPerformanceMetrics();
+            } 
+            else if (activeTab === 'services') {
+                viewport.innerHTML = `
+                    <div class="flex-1 flex flex-col min-w-0" style="background-color: var(--surface); font-size: 0.875rem;">
+                        <!-- Filters Header -->
+                        <div class="filters-header">
+                            <button id="btn-refresh-services" class="icon-btn" title="Refresh">
+                                <i data-lucide="refresh-cw"></i>
+                            </button>
+                            
+                            <div class="search-container">
+                                <i data-lucide="search" style="color: var(--muted); flex-shrink: 0;"></i>
+                                <input id="service-search-input" type="text" placeholder="Type to search"/>
+                            </div>
+                        </div>
+
+                        <!-- Service Master Details layout -->
+                        <div class="split-layout">
+                            <div style="flex: 1; overflow: auto; position: relative;">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 25%">Name</th>
+                                            <th style="width: 50px; text-align: center;">Toggle</th>
+                                            <th>Status</th>
+                                            <th>Start type</th>
+                                            <th>Account</th>
+                                            <th style="text-align: right;">PID</th>
+                                            <th style="text-align: right;">Memory</th>
+                                            <th style="width: 30%">Description</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="services-tbody">
+                                        <!-- Dynamic rows -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div id="service-side-panel" class="side-panel hidden">
+                                <!-- Details rendered here -->
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                // Setup listener inputs
+                document.getElementById('btn-refresh-services').onclick = () => pollServicesData();
+                document.getElementById('service-search-input').oninput = () => renderServicesTable();
+                pollServicesData();
+            } 
+            else if (activeTab === 'startup') {
+                viewport.innerHTML = `
+                    <div class="flex-1 flex flex-col min-w-0" style="background-color: var(--surface); font-size: 0.875rem;">
+                        <!-- Filters Header -->
+                        <div class="filters-header">
+                            <button id="btn-refresh-startup" class="icon-btn" title="Refresh">
+                                <i data-lucide="refresh-cw"></i>
+                            </button>
+                            
+                            <div class="search-container">
+                                <i data-lucide="search" style="color: var(--muted); flex-shrink: 0;"></i>
+                                <input id="startup-search-input" type="text" placeholder="Type to search"/>
+                            </div>
+                        </div>
+
+                        <!-- Startup Items & details -->
+                        <div class="split-layout">
+                            <div style="flex: 1; overflow: auto; position: relative;">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 50px; text-align: center;">Toggle</th>
+                                            <th style="width: 30%">Name</th>
+                                            <th>Package</th>
+                                            <th>Startup impact</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="startup-tbody">
+                                        <!-- Rows -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div id="startup-side-panel" class="side-panel hidden">
+                                <!-- Startup Item Details -->
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                // Add search behaviors
+                document.getElementById('btn-refresh-startup').onclick = () => pollStartupData();
+                document.getElementById('startup-search-input').oninput = () => renderStartupTable();
+                pollStartupData();
+            } 
+            else if (activeTab === 'settings') {
+                viewport.innerHTML = `
+                    <div class="flex-1 flex flex-col overflow-hidden" style="background-color: var(--surface);">
+                        <!-- Breadcrumb Area -->
+                        <div style="width: 100%; max-width: 56rem; margin-left: auto; margin-right: auto; padding-top: 1.5rem; padding-bottom: 1rem; z-index: 40; display: flex; align-items: center; flex-shrink: 0;">
+                            <div id="settings-breadcrumbs" class="mask-fade-edges" style="display: flex; align-items: center; overflow-x: auto; white-space: nowrap; font-weight: 600; font-size: 1.25rem;">
+                                <!-- Injected dynamically -->
+                            </div>
+                        </div>
+
+                        <!-- settings node view port -->
+                        <div id="settings-viewport" style="position: relative; flex: 1; width: 100%; overflow: hidden;">
+                            <!-- Injected container -->
+                        </div>
+                    </div>
+                `;
+                initSettingsView();
+            }
+
+            lucide.createIcons();
+        }
+
+        // --- Data Fetch Loops (Mirrors API setup completely) ---
+
+        // /api/exec single-record results arrive as a BARE OBJECT ('| ConvertTo-Json' unwraps a
+        // one-item pipeline) — coerce every response to an array before use. {error} envelopes are
+        // thrown by executeCommand, so the catch sites below render them; never a silent empty table.
+        function asArray(res) {
+            return Array.isArray(res) ? res : (res && !res.error ? [res] : []);
+        }
+        // Degrade-and-record: a failed poll renders a visible row, never a silently empty table.
+        function renderErrorRow(tbodyId, cols, msg) {
+            const tbody = document.getElementById(tbodyId);
+            if (tbody) tbody.innerHTML = `<tr><td colspan="${cols}" class="text-center" style="color: var(--accent-2); padding: 2rem;">${msg}</td></tr>`;
+        }
+
+        let pollTimeout = null;
+
+        function triggerDataPollingLoop() {
+            if (pollTimeout) clearTimeout(pollTimeout);
+
+            let delay = 1500;
+            if (settingsStore.updateSpeed === 'high') delay = 750;
+            else if (settingsStore.updateSpeed === 'low') delay = 4000;
+            else if (settingsStore.updateSpeed === 'paused') {
+                pollTimeout = setTimeout(triggerDataPollingLoop, 2000);
+                return;
+            }
+
+            // Execute parallel polls
+            pollActiveTabRealtimeMetrics().then(() => {
+                pollTimeout = setTimeout(triggerDataPollingLoop, delay);
+            });
+        }
+
+        async function pollActiveTabRealtimeMetrics() {
+            // Update performance buffers in background regardless of tab
+            const perfSnapshot = await getPerformanceSnapshotData();
+            updatePerfCanvasBuffers(perfSnapshot);
+
+            if (activeTab === 'processes' || activeTab === 'details') {
+                await fetchProcessTree();
+            } else if (activeTab === 'threads') {
+                await fetchThreadsData();
+            } else if (activeTab === 'performance') {
+                renderPerformanceDetails(); 
+            }
+        }
+
+        // --- Process tree generation & rendering ---
+        // Processes = the VOM owner tree (Get-VomOwner; owners ARE this OS's processes, ObQuery /
+        // VOM-SPEC §6a), rebuilt from parent paths. Fallback = the flat Android Get-Process view.
+        async function fetchProcessTree() {
+            let processesData = null;
+            let vomError = null;
+            try {
+                const owners = asArray(await executeCommand(`Get-VomOwner -ErrorAction SilentlyContinue`));
+                if (owners.length) {
+                    const nodes = new Map();
+                    owners.forEach(o => nodes.set(o.path, {
+                        id: o.path,
+                        name: (o.path || '').split('\\').filter(Boolean).pop() || o.path,
+                        userName: o.path,
+                        status: o.cancelled ? 'cancelling' : '',
+                        cpu: 0,
+                        memory: o.bytes != null ? o.bytes / 1048576 : 0,
+                        disk: 0,
+                        network: 0,
+                        children: []
+                    }));
+                    const roots = [];
+                    owners.forEach(o => {
+                        const n = nodes.get(o.path);
+                        const p = o.parent ? nodes.get(o.parent) : null;
+                        if (p) p.children.push(n); else roots.push(n);
+                    });
+                    // VOM enumeration is in-process — no adb pairing involved, so no banner.
+                    processesData = { elevated: true, processes: roots };
+                }
+            } catch (err) { vomError = err; }
+
+            if (!processesData) {
+                try {
+                    // Fetch flat processes from local node fallback as structured by API
+                    const fallbackRes = await executeCommand(`
+                        $procs = Get-Process -ErrorAction SilentlyContinue | Select-Object -Property Name, Id, WorkingSet, CPU
+                        $mapped = @()
+                        if ($procs) {
+                            foreach($p in $procs) {
+                                $mapped += [pscustomobject]@{
+                                    id = if ($p.Id) { $p.Id.ToString() } else { [guid]::NewGuid().ToString() }
+                                    name = if ($p.Name) { $p.Name } else { 'Unknown' }
+                                    cpu = if ($p.CPU) { $p.CPU } else { 0 }
+                                    memory = if ($p.WorkingSet) { [math]::Round($p.WorkingSet / 1MB, 2) } else { 0 }
+                                    disk = 0
+                                    network = 0
+                                }
+                            }
+                        }
+                        [pscustomobject]@{ elevated = $false; processes = $mapped }
+                    `);
+                    const rec = asArray(fallbackRes)[0];
+                    processesData = rec ? { elevated: !!rec.elevated, processes: asArray(rec.processes) } : { elevated: false, processes: [] };
+                } catch (err) {
+                    // Both lanes failed — surface the first error where the table would be.
+                    const e = vomError || err;
+                    const isDetails = activeTab === 'details';
+                    renderErrorRow(isDetails ? 'details-tbody' : 'processes-tbody', isDetails ? 7 : 6,
+                        'Process query failed: ' + (e.message || e));
+                    return;
+                }
+            }
+
+            isElevated = processesData.elevated;
+            const banner = document.getElementById('elevation-banner');
+            if (banner) {
+                if (!isElevated) banner.classList.remove('hidden');
+                else banner.classList.add('hidden');
+            }
+
+            let list = asArray(processesData.processes);
+            parsedProcesses = list;
+            
+            // Flatten for details view mapping
+            const flat = [];
+            const helper = (n) => {
+                flat.push({
+                    id: n.id,
+                    name: n.name,
+                    userName: n.userName || 'unknown (uid)',
+                    cpu: n.cpu || 0,
+                    memory: n.memory || 0,
+                    architecture: 'arm64'
+                });
+                if (n.children) n.children.forEach(helper);
+            };
+            list.forEach(helper);
+            processFlatList = flat;
+
+            // Expand roots by default
+            if (expandedRows.size === 0 && list.length > 0) {
+                list.forEach(p => expandedRows.add(p.id));
+            }
+
+            if (activeTab === 'processes') {
+                buildProcessesTable();
+            } else if (activeTab === 'details') {
+                buildDetailsTable();
+            }
+        }
+
+        function buildProcessesTable() {
+            const tbody = document.getElementById('processes-tbody');
+            if (!tbody) return;
+
+            if (parsedProcesses.length === 0) {
+                tbody.innerHTML = `<tr><td colSpan="6" class="text-center" style="color: var(--muted); padding: 2rem;">Loading processes...</td></tr>`;
+                return;
+            }
+
+            let aggCpu = 0;
+            let aggMem = 0;
+            parsedProcesses.forEach(p => {
+                aggCpu += p.cpu || 0;
+                aggMem += p.memory || 0;
+            });
+
+            const cpuAgg = document.getElementById('proc-cpu-agg');
+            const memAgg = document.getElementById('proc-mem-agg');
+            if (cpuAgg) cpuAgg.textContent = `${aggCpu.toFixed(0)}%`;
+            if (memAgg) memAgg.textContent = `${aggMem.toLocaleString(undefined, {maximumFractionDigits:0})} MB`;
+
+            let htmlBuf = '';
+            parsedProcesses.forEach(p => {
+                htmlBuf += generateProcessRowMarkup(p, 0);
+            });
+
+            tbody.innerHTML = htmlBuf;
+            bindProcessRowEvents();
+        }
+
+        function generateProcessRowMarkup(p, depth) {
+            const hasChildren = p.children && p.children.length > 0;
+            const isRowExpanded = expandedRows.has(p.id);
+            const isSelected = selectedRowId === p.id;
+            
+            const cpuBg = p.cpu > 0 ? `rgba(17, 50, 85, ${Math.min(p.cpu / 10 + 0.3, 1)})` : 'transparent';
+            const memBg = `rgba(17, 50, 85, ${Math.min(p.memory / 4000 + 0.2, 1)})`;
+
+            let rowHtml = `
+                <tr data-id="${p.id}" class="process-row ${isSelected ? 'selected' : ''}" oncontextmenu="triggerProcessContext(event, '${p.id}')">
+                    <td style="padding-left: 1rem; position: relative;">
+                        ${isSelected ? '<div style="position: absolute; left: 0; top: 10%; height: 80%; width: 3px; background-color: var(--accent); border-radius: 0 4px 4px 0;"></div>' : ''}
+                        <div class="flex items-center gap-2" style="padding-left: ${depth * 16}px">
+                            <div class="toggle-btn" data-id="${p.id}">
+                                ${hasChildren ? 
+                                    (isRowExpanded ? `<i data-lucide="chevron-down" style="width: 1rem; height: 1rem; color: var(--muted);"></i>` : `<i data-lucide="chevron-right" style="width: 1rem; height: 1rem; color: var(--muted);"></i>`) 
+                                    : ''
+                                }
+                            </div>
+                            <div style="width: 1rem; height: 1rem; background-color: var(--muted); border-radius: 0.125rem; flex-shrink: 0;"></div>
+                            <span class="truncate" style="padding-right: 1rem;">${p.name}</span>
+                        </div>
+                    </td>
+                    <td class="text-right" style="padding-left: 0.5rem; padding-right: 0.5rem; background-color: ${cpuBg}">
+                        ${p.cpu > 0 ? `${p.cpu.toFixed(1)}%` : '0%'}
+                    </td>
+                    <td class="text-center" style="padding-left: 0.25rem; padding-right: 0.25rem;">
+                        ${p.status === 'efficiency' ? `<i data-lucide="leaf" style="width: 1rem; height: 1rem; color: var(--success); display: inline-block;"></i>` : ''}
+                    </td>
+                    <td class="text-right font-mono" style="padding-left: 0.5rem; padding-right: 0.5rem; background-color: ${memBg}">
+                        ${p.memory.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MB
+                    </td>
+                    <td class="text-right font-mono text-xs" style="padding-left: 0.5rem; padding-right: 0.5rem; color: var(--muted);">
+                        ${p.disk > 0 ? `${p.disk} MB/s` : '0 MB/s'}
+                    </td>
+                    <td class="text-right font-mono text-xs" style="padding-left: 0.5rem; padding-right: 0.5rem; color: var(--muted);">
+                        ${p.network > 0 ? `${p.network} Mbps` : '0 Mbps'}
+                    </td>
+                </tr>
+            `;
+
+            if (hasChildren && isRowExpanded) {
+                p.children.forEach(child => {
+                    rowHtml += generateProcessRowMarkup(child, depth + 1);
+                });
+            }
+
+            return rowHtml;
+        }
+
+        function bindProcessRowEvents() {
+            lucide.createIcons();
+            // Bind Expansion buttons clicks
+            document.querySelectorAll('#processes-tbody .toggle-btn').forEach(btn => {
+                btn.onclick = (e) => {
+                    e.stopPropagation();
+                    const id = btn.getAttribute('data-id');
+                    if (expandedRows.has(id)) expandedRows.delete(id);
+                    else expandedRows.add(id);
+                    buildProcessesTable();
+                }
+            });
+
+            // Bind selection clicks
+            document.querySelectorAll('#processes-tbody .process-row').forEach(row => {
+                row.onclick = () => {
+                    const id = row.getAttribute('data-id');
+                    selectRow(id);
+                }
+            });
+        }
+
+        function selectRow(id) {
+            selectedRowId = id;
+            const btnEnd = document.getElementById('btn-end-task');
+            if (btnEnd) btnEnd.disabled = false;
+            
+            // Rebuild relevant tables with updated selection active state
+            if (activeTab === 'processes') buildProcessesTable();
+            if (activeTab === 'details') buildDetailsTable();
+            if (activeTab === 'threads') buildThreadsTable();
+            if (activeTab === 'services') renderServicesTable();
+            if (activeTab === 'startup') renderStartupTable();
+        }
+
+        function triggerProcessContext(e, id) {
+            e.preventDefault();
+            selectRow(id);
+            showContextMenu(e.clientX, e.clientY, [
+                {
+                    label: 'End task',
+                    icon: 'stop-circle',
+                    action: () => handleEndTask(id)
+                }
+            ]);
+        }
+        window.triggerProcessContext = triggerProcessContext;
+
+        async function handleEndTask(id) {
+            const res = await stopAndroidProcess(id);
+            if (!res.ok) {
+                alert(res.message);
+            } else {
+                selectedRowId = null;
+                const btnEnd = document.getElementById('btn-end-task');
+                if (btnEnd) btnEnd.disabled = true;
+                await fetchProcessTree();
+            }
+        }
+
+        async function stopAndroidProcess(pid) {
+            // VOM owner rows carry path ids (\Sessions\…) → Stop-VomThread (cancel + reclaim);
+            // Android PID rows from the fallback view → Stop-AndroidProcess.
+            try {
+                const cmd = String(pid).startsWith('\\')
+                    ? `Stop-VomThread -HandleId '${pid}' -ErrorAction SilentlyContinue`
+                    : `Stop-AndroidProcess -ProcessId ${pid} -ErrorAction SilentlyContinue`;
+                const resp = asArray(await executeCommand(cmd))[0];
+                if (resp) return resp;
+            } catch (err) {
+                return { ok: false, message: String(err.message || err) };
+            }
+            return { ok: false, message: "Fallback: Cannot stop protected Android processes without elevation or pairing credentials." };
+        }
+
+        // --- Details view flat list mapping ---
+        function buildDetailsTable() {
+            const tbody = document.getElementById('details-tbody');
+            if (!tbody) return;
+
+            if (processFlatList.length === 0) {
+                tbody.innerHTML = `<tr><td colSpan="7" class="text-center" style="color: var(--muted); padding: 2rem;">Loading process details...</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = processFlatList.map(row => {
+                const isSelected = selectedRowId === row.id;
+                return `
+                    <tr data-id="${row.id}" class="details-row ${isSelected ? 'selected' : ''}" oncontextmenu="triggerProcessContext(event, '${row.id}')">
+                        <td style="padding-left: 1rem; position: relative;">
+                            ${isSelected ? '<div style="position: absolute; left: 0; top: 10%; height: 80%; width: 3px; background-color: var(--accent); border-radius: 0 4px 4px 0;"></div>' : ''}
+                            <div class="flex items-center gap-2">
+                                <div style="width: 1rem; height: 1rem; background-color: var(--muted); border-radius: 0.125rem; flex-shrink: 0;"></div>
+                                <span class="truncate" style="font-weight: 500;">${row.name}</span>
+                            </div>
+                        </td>
+                        <td style="padding-left: 0.75rem; padding-right: 0.75rem; color: var(--fg); font-family: var(--font-mono); font-size: 0.75rem;">${row.id}</td>
+                        <td style="padding-left: 0.75rem; padding-right: 0.75rem; color: var(--muted);">Running</td>
+                        <td style="padding-left: 0.75rem; padding-right: 0.75rem; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px;" title="${row.userName}">${row.userName}</td>
+                        <td style="padding-left: 0.75rem; padding-right: 0.75rem; color: var(--fg); text-align: right; font-family: var(--font-mono);">${row.cpu > 0 ? row.cpu.toFixed(1) + '%' : '0.0%'}</td>
+                        <td style="padding-left: 0.75rem; padding-right: 1.5rem; text-align: right; font-family: var(--font-mono); color: var(--fg);">${(row.memory * 1024).toLocaleString()} K</td>
+                        <td style="padding-left: 0.75rem; padding-right: 0.75rem; color: var(--muted); font-family: var(--font-mono); font-size: 0.75rem;">${row.architecture}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Bind click events
+            document.querySelectorAll('#details-tbody .details-row').forEach(row => {
+                row.onclick = () => {
+                    const id = row.getAttribute('data-id');
+                    selectRow(id);
+                }
+            });
+        }
+
+        // Startup-apps table
+        function renderStartupTable() {
+            const tbody = document.getElementById('startup-tbody');
+            if (!tbody) return;
+            tbody.innerHTML = startupApps.map(app => {
+                const isSelected = selectedRowId === app.receiver;
+                let impactColor = 'var(--muted)';
+                if (app.impact === 'high') impactColor = '#f87171';
+                else if (app.impact === 'medium') impactColor = '#fbbf24';
+                else if (app.impact === 'low') impactColor = '#34d399';
+                return `
+                    <tr data-id="${app.receiver}" class="startup-row ${isSelected ? 'selected' : ''}" onclick="selectStartupRow(event, '${app.receiver}')">
+                        <td style="padding-left: 1rem; text-align: center;">
+                            <button onclick="event.stopPropagation(); toggleStartupAppEnabled('${app.receiver}', ${app.enabled})" class="badge-toggle ${app.enabled ? 'on' : 'off'}">${app.enabled ? 'On' : 'Off'}</button>
+                        </td>
+                        <td style="padding-left: 0.75rem; padding-right: 0.75rem; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px;" title="${app.label}">${app.label}</td>
+                        <td style="padding-left: 0.75rem; padding-right: 0.75rem; color: var(--muted); font-family: var(--font-mono); font-size: 0.75rem; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${app.package}">${app.package}</td>
+                        <td style="padding-left: 0.75rem; padding-right: 0.75rem;">
+                            <span style="font-weight: 500; text-transform: capitalize; color: ${impactColor}; font-size: 0.75rem;">
+                                ${app.impact}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            renderSelectedStartupSidePanel();
+        }
+
+        // Fetch the device's startup (boot-receiver) apps
+        async function pollStartupData() {
+            try {
+                const res = await executeCommand(`Get-AndroidStartup -ErrorAction SilentlyContinue`);
+                const list = (res && Array.isArray(res.items)) ? res.items
+                           : (res && Array.isArray(res.startup)) ? res.startup
+                           : asArray(res);   // bare object = a single startup record
+                if (list.length) {
+                    startupApps = list.map(s => ({
+                        package:  s.package  || s.Package  || s.packageName || '',
+                        label:    s.label    || s.Label    || s.name || s.package || 'Unknown',
+                        receiver: s.receiver || s.Receiver || s.component || ((s.package || 'app') + '.BootReceiver'),
+                        enabled:  (s.enabled  != null) ? !!s.enabled : (s.Enabled != null ? !!s.Enabled : true),
+                        impact:   s.impact   || s.Impact   || 'unknown'
+                    }));
+                }
+            } catch (err) {
+                renderErrorRow('startup-tbody', 4, 'Get-AndroidStartup failed: ' + (err.message || err));
+                return;
+            }
+            renderStartupTable();
+        }
+
+        function selectStartupRow(e, receiver) {
+            selectRow(receiver);
+            renderSelectedStartupSidePanel();
+        }
+        window.selectStartupRow = selectStartupRow;
+
+        function renderSelectedStartupSidePanel() {
+            const sidePanel = document.getElementById('startup-side-panel');
+            if (!sidePanel) return;
+
+            const selectedApp = startupApps.find(s => s.receiver === selectedRowId);
+            if (!selectedApp) {
+                sidePanel.classList.add('hidden');
+                return;
+            }
+
+            sidePanel.classList.remove('hidden');
+
+            let impactColor = 'var(--muted)';
+            if (selectedApp.impact === 'high') impactColor = "#f87171";
+            else if (selectedApp.impact === 'medium') impactColor = "#fbbf24";
+            else if (selectedApp.impact === 'low') impactColor = "#34d399";
+
+            sidePanel.innerHTML = `
+                <h3 style="font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${selectedApp.label}">${selectedApp.label}</h3>
+                
+                <div style="margin-top: 1rem; font-size: 0.875rem; flex: 1; display: flex; flex-direction: column; gap: 1rem;">
+                    <div>
+                        <div style="color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; font-weight: 600;">Status</div>
+                        <div class="flex items-center gap-2" style="color: var(--fg);">
+                            <div style="width: 0.625rem; height: 0.625rem; border-radius: 50%; background-color: ${selectedApp.enabled ? '#22c55e' : 'var(--muted)'};"></div>
+                            ${selectedApp.enabled ? 'Enabled' : 'Disabled'}
+                        </div>
+                    </div>
+
+                    <div>
+                        <div style="color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.25rem; font-weight: 600;">
+                            <i data-lucide="gauge" style="width: 0.875rem; height: 0.875rem;"></i> Startup Impact
+                        </div>
+                        <div style="font-weight: 600; text-transform: capitalize; font-size: 1rem; color: ${impactColor};">
+                            ${selectedApp.impact}
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <div style="color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; font-family: var(--font-mono); display: flex; align-items: center; gap: 0.25rem; font-weight: 600;">
+                            <i data-lucide="box" style="width: 0.875rem; height: 0.875rem; color: var(--muted);"></i> Package
+                        </div>
+                        <div style="color: var(--fg); font-family: var(--font-mono); font-size: 0.75rem; word-break: break-all; border: 1px solid rgba(255,255,255,0.05); background-color: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 0.25rem;">
+                            ${selectedApp.package}
+                        </div>
+                    </div>
+
+                    <div>
+                        <div style="color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; font-family: var(--font-mono); display: flex; align-items: center; gap: 0.25rem; font-weight: 600;">
+                            <i data-lucide="box" style="width: 0.875rem; height: 0.875rem; color: var(--muted);"></i> Code boot receiver
+                        </div>
+                        <div style="color: var(--fg); font-family: var(--font-mono); font-size: 0.75rem; word-break: break-all; border: 1px solid rgba(255,255,255,0.05); background-color: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 0.25rem;">
+                            ${selectedApp.receiver}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            lucide.createIcons({ root: sidePanel });
+        }
+
+        async function toggleStartupAppEnabled(receiver, curVal) {
+            const nextVal = !curVal;
+            const idx = startupApps.findIndex(s => s.receiver === receiver);
+            if (idx === -1) return;
+            startupApps[idx].enabled = nextVal;
+            renderStartupTable();
+
+            try {
+                const payloadCommand = `Set-AndroidStartup -Receiver '${receiver}' -Enabled ${nextVal ? '$true' : '$false'} -ErrorAction SilentlyContinue`;
+                await executeCommand(payloadCommand);
+            } catch (err) {
+                console.error('Set-AndroidStartup failed:', err);   // recorded, not swallowed
+            }
+            await pollStartupData();   // re-read live state either way — no optimistic lie
+        }
+        window.toggleStartupAppEnabled = toggleStartupAppEnabled;
+
+
+        // --- Settings Navigation Stack & Dynamic Nodes ---
+        const settingsDataMap = {
+            "Settings.Root": { type: "View", title: "Settings" },
+
+            "Settings.Root.DefaultPage": { type: "Surface", title: "Default Start Page", parent: "Settings.Root" },
+            "Settings.Root.DefaultPage.Select": { type: "RadioGroup", label: "Choose the default page when opening", value: "processes", options: "processes:Processes, performance:Performance, details:Details, threads:Threads, services:Services", storeKey: "defaultPage", parent: "Settings.Root.DefaultPage" },
+
+            "Settings.Root.UpdateSpeed": { type: "Surface", title: "Real-time update speed", parent: "Settings.Root" },
+            "Settings.Root.UpdateSpeed.Select": { type: "RadioGroup", label: "Set how often data updates", value: "normal", options: "high:High, normal:Normal, low:Low, paused:Paused", storeKey: "updateSpeed", parent: "Settings.Root.UpdateSpeed" },
+
+            "Settings.Root.Window": { type: "Surface", title: "Window management", parent: "Settings.Root" },
+            "Settings.Root.Window.AlwaysOnTop": { type: "Toggle", label: "Always on top", caption: "Keep Task Manager on top of other windows", value: false, storeKey: "alwaysOnTop", parent: "Settings.Root.Window" },
+            "Settings.Root.Window.MinimizeOnUse": { type: "Toggle", label: "Minimize on use", caption: "Minimize when a task is ended", value: false, storeKey: "minimizeOnUse", parent: "Settings.Root.Window" },
+            "Settings.Root.Window.HideWhenMinimized": { type: "Toggle", label: "Hide when minimized", caption: "Hide to notification area when minimized", value: false, storeKey: "hideWhenMinimized", parent: "Settings.Root.Window" },
+
+            "Settings.Root.Nav.About": { type: "ActionRow", label: "About", caption: "Version information", icon: "help-circle", target: "Settings.About", parent: "Settings.Root" },
+
+            "Settings.About": { type: "View", title: "About" },
+            "Settings.About.AppHeader": { type: "Header", title: "Task Manager (Vanilla)", subtitle: "Version 1.0.0", copyright: "© 2026. All rights reserved.", parent: "Settings.About" },
+        };
+
+        let settingsNavStack = ["Settings.Root"];
+
+        function initSettingsView() {
+            renderBreadcrumbBar();
+            renderActiveSettingsPage();
+        }
+
+        function renderBreadcrumbBar() {
+            const container = document.getElementById('settings-breadcrumbs');
+            if (!container) return;
+
+            container.innerHTML = settingsNavStack.map((id, index) => {
+                const isLast = index === settingsNavStack.length - 1;
+                const config = settingsDataMap[id] || { title: id };
+                return `
+                    <div class="flex items-center">
+                        <button onclick="${isLast ? '' : `goToBreadcrumbIndex(${index})`}" style="padding-left: 0.5rem; padding-right: 0.5rem; padding-top: 0.25rem; padding-bottom: 0.25rem; border-radius: 0.375rem; background: transparent; border: none; transition: all 150ms; cursor: ${isLast ? 'default' : 'pointer'}; color: ${isLast ? 'var(--fg)' : 'var(--muted)'};">
+                            <span>${config.title}</span>
+                        </button>
+                        ${!isLast ? `<span style="color: var(--muted); font-weight: 400; padding-left: 0.375rem; padding-right: 0.375rem;">&gt;</span>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function goToBreadcrumbIndex(idx) {
+            settingsNavStack = settingsNavStack.slice(0, idx + 1);
+            initSettingsView();
+        }
+        window.goToBreadcrumbIndex = goToBreadcrumbIndex;
+
+        function pushSettingsViewRoute(id) {
+            settingsNavStack.push(id);
+            initSettingsView();
+        }
+        window.pushSettingsViewRoute = pushSettingsViewRoute;
+
+        function renderActiveSettingsPage() {
+            const target = document.getElementById('settings-viewport');
+            if (!target) return;
+
+            const currViewId = settingsNavStack[settingsNavStack.length - 1];
+            const children = Object.keys(settingsDataMap).filter(k => settingsDataMap[k].parent === currViewId);
+            const isSingleNode = children.length === 0;
+
+            const displayNodes = isSingleNode ? [currViewId] : children;
+
+            target.innerHTML = `
+                <div class="settings-content-wrapper" style="gap: ${isSingleNode ? '1.5rem' : '0.75rem'}">
+                    ${displayNodes.map(childId => generateSettingsNodeHTML(childId)).join('')}
+                </div>
+            `;
+
+            lucide.createIcons({ root: target });
+            bindSettingsInteractiveEvents();
+        }
+
+        function generateSettingsNodeHTML(nodeId) {
+            const config = settingsDataMap[nodeId];
+            if (!config) return '';
+
+            if (config.type === 'Surface') {
+                const innerChildren = Object.keys(settingsDataMap).filter(k => settingsDataMap[k].parent === nodeId);
+                return `
+                    <div class="settings-section-card">
+                        ${config.title ? `
+                            <div class="settings-card-header">
+                                <h3>${config.title}</h3>
+                            </div>
+                        ` : ''}
+                        <div class="flex flex-col">
+                            ${innerChildren.map((childId, idx) => `
+                                <div class="flex flex-col" style="${idx < innerChildren.length - 1 ? 'border-bottom: 1px solid rgba(255, 255, 255, 0.05);' : ''}">
+                                    ${generateSettingsNodeHTML(childId)}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (config.type === 'ActionRow') {
+                return `
+                    <button onclick="pushSettingsViewRoute('${config.target}')" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 1rem; background-color: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 0.5rem; transition: all 150ms; text-align: left; cursor: pointer;">
+                        <div class="flex items-center gap-4">
+                            <div style="color: var(--muted); display: flex;">
+                                <i data-lucide="${config.icon}" style="width: 1.25rem; height: 1.25rem;"></i>
+                            </div>
+                            <div>
+                                <div class="settings-row-label">${config.label}</div>
+                                ${config.caption ? `<div class="settings-row-desc">${config.caption}</div>` : ''}
+                            </div>
+                        </div>
+                        <div>
+                            <i data-lucide="chevron-right" style="width: 1.125rem; height: 1.125rem; color: var(--muted);"></i>
+                        </div>
+                    </button>
+                `;
+            }
+
+            if (config.type === 'Toggle') {
+                const isChecked = settingsStore[config.storeKey] === true;
+                return `
+                    <label class="settings-row" style="cursor: pointer;">
+                        <div>
+                            <div class="settings-row-label">${config.label}</div>
+                            ${config.caption ? `<div class="settings-row-desc">${config.caption}</div>` : ''}
+                        </div>
+                        <input 
+                            type="checkbox" 
+                            data-key="${config.storeKey}"
+                            class="settings-checkbox"
+                            ${isChecked ? 'checked' : ''}
+                        />
+                    </label>
+                `;
+            }
+
+            if (config.type === 'RadioGroup') {
+                const options = (config.options || '').split(',').map(o => {
+                    const parts = o.split(':');
+                    return { k: parts[0].trim(), v: (parts[1] || parts[0]).trim() };
+                });
+                const storeVal = settingsStore[config.storeKey];
+
+                return `
+                    <div class="settings-row flex-col" style="align-items: flex-start; gap: 0.5rem;">
+                        <div class="settings-row-label">${config.label}</div>
+                        ${config.caption ? `<div class="settings-row-desc" style="margin-top: 0;">${config.caption}</div>` : ''}
+                        <div class="flex flex-wrap gap-4" style="margin-top: 0.5rem;">
+                            ${options.map(opt => `
+                                <label class="flex items-center gap-2 text-sm text-[var(--fg)]" style="cursor: pointer;">
+                                    <input 
+                                        type="radio" 
+                                        name="${config.storeKey}" 
+                                        value="${opt.k}" 
+                                        class="settings-radio-btn"
+                                        ${storeVal === opt.k ? 'checked' : ''}
+                                    />
+                                    <span>${opt.v}</span>
+                                </label>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (config.type === 'Header') {
+                return `
+                    <div style="padding: 1.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
+                        <div style="width: 4rem; height: 4rem; background-color: #012456; border-radius: 1rem; display: flex; align-items: center; justify-content: center; margin-bottom: 1rem; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2);">
+                            <span style="font-weight: 800; color: #ec4899; font-size: 2.25rem; letter-spacing: -0.05em; margin-top: 0.25rem; margin-right: 0.25rem;">&gt;_</span>
+                        </div>
+                        <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--fg); margin: 0;">${config.title}</h2>
+                        ${config.subtitle ? `<p style="font-size: 0.875rem; color: var(--muted); margin-top: 0.25rem; margin-bottom: 0;">${config.subtitle}</p>` : ''}
+                        ${config.copyright ? `<p style="font-size: 0.75rem; color: var(--muted); margin-top: 0.5rem; margin-bottom: 0;">${config.copyright}</p>` : ''}
+                    </div>
+                `;
+            }
+
+            return '';
+        }
+
+        function bindSettingsInteractiveEvents() {
+            document.querySelectorAll('.settings-checkbox').forEach(cb => {
+                cb.onchange = () => {
+                    const storeKey = cb.getAttribute('data-key');
+                    settingsStore[storeKey] = cb.checked;
+                    console.log(`Updated setting cb ${storeKey}: ${cb.checked}`);
+                }
+            });
+
+            document.querySelectorAll('.settings-radio-btn').forEach(rad => {
+                rad.onchange = () => {
+                    const storeKey = rad.getAttribute('name');
+                    settingsStore[storeKey] = rad.value;
+                    console.log(`Updated setting rad ${storeKey}: ${rad.value}`);
+                }
+            });
+        }
+
+
+        // --- Global custom Context Menu utils ---
+        function showContextMenu(clientX, clientY, items) {
+            const menu = document.getElementById('context-menu');
+            if (!menu) return;
+
+            menu.innerHTML = items.map(item => {
+                if (item.isDivider) {
+                    return `<div style="height: 1px; background-color: var(--border); margin: 0.25rem 0.5rem;"></div>`;
+                }
+                const disabledAttr = item.disabled ? 'disabled' : '';
+                return `
+                    <button ${disabledAttr} class="context-item">
+                        <span class="flex items-center gap-2">
+                            ${item.icon ? `<i data-lucide="${item.icon}" style="width: 1rem; height: 1rem;"></i>` : '<span style="width: 1rem; height: 1rem;"></span>'}
+                            ${item.label}
+                        </span>
+                    </button>
+                `;
+            }).join('');
+
+            lucide.createIcons({ root: menu });
+
+            const buttons = menu.querySelectorAll('.context-item');
+            let idx = 0;
+            items.forEach((item) => {
+                if (item.isDivider) return;
+                const btn = buttons[idx++];
+                if (item.action && !item.disabled) {
+                    btn.onclick = (e) => {
+                        e.stopPropagation();
+                        item.action();
+                        hideContextMenu();
+                    };
+                }
+            });
+
+            menu.classList.remove('hidden');
+
+            const winWidth = window.innerWidth;
+            const winHeight = window.innerHeight;
+            const menuWidth = menu.clientWidth || 210;
+            const menuHeight = menu.clientHeight || 150;
+
+            let x = clientX;
+            let y = clientY;
+
+            if (x + menuWidth > winWidth) x = winWidth - menuWidth - 8;
+            if (y + menuHeight > winHeight) y = winHeight - menuHeight - 8;
+
+            menu.style.left = `${x}px`;
+            menu.style.top = `${y}px`;
+        }
+
+        function hideContextMenu() {
+            const menu = document.getElementById('context-menu');
+            if (menu) menu.classList.add('hidden');
+        }
+
+        // Real metrics only — each one is a slot in THE STATE TEXTURE (the Float32 VOM region
+        // "system-state"): live numeric state rides the data plane as binary, never a serialized
+        // envelope, and none of it needs the elevated adb channel.
+        const PERF_METRICS = [
+            { id: 'mem',        label: 'Memory',       unit: '%',  max: 100 },
+            { id: 'vomHandles', label: 'VOM Handles',  unit: '',   max: 0 },
+            { id: 'vomMb',      label: 'VOM Memory',   unit: ' MB', max: 0 },
+            { id: 'sessions',   label: 'Sessions',     unit: '',   max: 0 },
+            { id: 'registry',   label: 'Registry',     unit: '',   max: 0 },
+        ];
+
+        // Pull one sample from the state texture (refresh-on-read server-side, 500ms staleness).
+        // Layout v1 header slots — see Dg.RefreshStateTexture; [0] must equal 1 or we don't guess.
+        async function getPerformanceSnapshotData() {
+            try {
+                const r = await fetch('/vom/system-state', { cache: 'no-store' });
+                if (!r.ok) return null;
+                const s = new Float32Array(await r.arrayBuffer());
+                if (s.length < 16 || s[0] !== 1) return null;
+                const ramTotal = s[9], ramAvail = s[10];
+                return {
+                    mem: ramTotal > 0 ? ((ramTotal - ramAvail) / ramTotal) * 100 : null,
+                    vomHandles: s[5],
+                    vomMb: s[6],
+                    sessions: s[7] + s[8],
+                    registry: s[11],
+                };
+            } catch (_) { return null; }
+        }
+
+        function updatePerfCanvasBuffers(snap) {
+            if (!snap) return;
+            for (const k of Object.keys(historicPerfBuffer)) {
+                if (snap[k] == null) continue;
+                historicPerfBuffer[k].push(snap[k]);
+                if (historicPerfBuffer[k].length > 60) historicPerfBuffer[k].shift();
+            }
+            const cpuAgg = document.getElementById('proc-cpu-agg'); if (cpuAgg && snap.cpu != null) cpuAgg.textContent = Math.round(snap.cpu) + '%';
+            if (activeTab === 'performance') renderPerformanceMetrics();
+        }
+
+        function renderPerformanceMetrics() {
+            const list = document.getElementById('perf-metrics-container');
+            const chart = document.getElementById('perf-chart-container');
+            if (!list || !chart) return;
+            list.innerHTML = PERF_METRICS.map(m => {
+                const a = historicPerfBuffer[m.id]; const v = a[a.length - 1] || 0;
+                const active = m.id === selectedPerfMetricId;
+                return `<button data-perf="${m.id}" class="sidebar-tab-btn ${active ? 'active' : ''}" style="justify-content: space-between; border-radius: 0; padding-left: 1rem; padding-right: 1rem;">
+                    <span class="text-sm">${m.label}</span>
+                    <span class="text-xs font-mono" style="color: var(--muted);">${Math.round(v)}${m.unit}</span></button>`;
+            }).join('');
+            list.querySelectorAll('[data-perf]').forEach(b => b.onclick = () => { selectedPerfMetricId = b.dataset.perf; renderPerformanceMetrics(); });
+            const m = PERF_METRICS.find(x => x.id === selectedPerfMetricId) || PERF_METRICS[0];
+            chart.innerHTML = `<div style="margin-bottom: 0.75rem;"><div style="font-size: 1.125rem; font-weight: 600; color: var(--fg);">${m.label}</div><div id="perf-current" style="font-size: 1.875rem; font-weight: 300; color: var(--accent);">—</div></div>
+                <canvas id="perf-canvas" height="220" style="width:100%;height:220px;background:color-mix(in srgb,var(--fg) 4%,transparent);border:1px solid var(--border);border-radius:8px;"></canvas>`;
+            renderPerformanceDetails();
+        }
+
+        function renderPerformanceDetails() {
+            const m = PERF_METRICS.find(x => x.id === selectedPerfMetricId) || PERF_METRICS[0];
+            const data = historicPerfBuffer[m.id] || [];
+            const cur = document.getElementById('perf-current'); if (cur) cur.textContent = Math.round(data[data.length - 1] || 0) + m.unit;
+            const cv = document.getElementById('perf-canvas'); if (!cv || !cv.getContext) return;
+            const W = cv.width = cv.clientWidth || 600, H = cv.height = 220;
+            const ctx = cv.getContext('2d'); ctx.clearRect(0, 0, W, H);
+            if (data.length < 2) return;
+            const accent = (getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()) || '#2a6cf0';
+            const max = m.max || Math.max(...data, 1);
+            ctx.beginPath();
+            data.forEach((v, i) => { const x = (i / (data.length - 1)) * W; const y = H - (Math.min(v, max) / max) * (H - 10) - 5; i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+            ctx.strokeStyle = accent; ctx.lineWidth = 2; ctx.stroke();
+            ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath(); ctx.fillStyle = accent + '22'; ctx.fill();
+        }
+
+        // Threads = VOM's threads-as-handles
+        async function fetchThreadsData() {
+            try {
+                const res = await executeCommand(`Get-VomThread -ErrorAction SilentlyContinue`);
+                const list = (res && Array.isArray(res.threads)) ? res.threads
+                           : asArray(res);   // bare object = a single live thread
+                threads = list.map((t, i) => ({
+                    id: t.id || t.Id || ('thread-' + i),
+                    name: t.name || t.Name || ('Thread ' + i),
+                    owner: t.owner || t.Owner || '—',
+                    type: t.type || t.Type || 'managed',
+                    status: t.status || t.State || 'running',
+                    memory: t.memory != null ? t.memory : (t.bytes != null ? Math.round(t.bytes / 1048576) : 0)
+                }));
+            } catch (err) {
+                renderErrorRow('threads-tbody', 5, 'Get-VomThread failed: ' + (err.message || err));
+                return;
+            }
+            if (activeTab === 'threads') buildThreadsTable();
+        }
+
+        function buildThreadsTable() {
+            const tbody = document.getElementById('threads-tbody'); if (!tbody) return;
+            if (!threads.length) { tbody.innerHTML = `<tr><td colspan="5" class="text-center" style="color: var(--muted); padding: 2rem;">No live threads.</td></tr>`; return; }
+            tbody.innerHTML = threads.map(t => {
+                const stColor = t.status === 'running' ? '#4ade80' : (t.status === 'cancelling' ? '#fbbf24' : 'var(--muted)');
+                return `<tr class="border-b border-transparent h-8 hover:bg-[var(--surface)]">
+                    <td class="pl-4 text-[var(--fg)] truncate"><span style="font-weight: 500;">${t.name}</span></td>
+                    <td class="px-3" style="color: var(--muted);">${t.owner}</td>
+                    <td class="px-3 text-center" style="color: var(--muted); text-transform: capitalize;">${t.type}</td>
+                    <td class="px-3 text-center" style="text-transform: capitalize; color: ${stColor};">${t.status}</td>
+                    <td class="px-3 text-right font-mono" style="color: var(--muted);">${t.memory} MB</td>
+                </tr>`;
+            }).join('');
+        }
+
+        // Services — the Sc layer (the SCM analog) is roadmap (docs/STATUS.md): render an honest
+        // empty state, never mock rows.
+        async function pollServicesData() {
+            services = [];
+            renderServicesTable();
+        }
+
+        function renderServicesTable() {
+            const tbody = document.getElementById('services-tbody'); if (!tbody) return;
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--muted); padding: 2rem;">Sc service layer not built yet.</td></tr>`;
+        }
+
+        // Boot
+        initApp();
+    </script>
+</body>
+</html>

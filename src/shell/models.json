@@ -1,0 +1,39 @@
+[
+  {
+    "_about": "The known, downloadable model set — DATA, not C# literals. The Registrar seeds each as \\Capability\\Model\\<id> (seed-if-absent, so a user/agent selection or a disk-discovered record survives reboots); ModelCatalog PROJECTS \\Capability\\Model\\* as the one truth and auto-discovers sideloaded files. `enabled` marks the active selection (single-active invariant kept by ModelCatalog.Select). No model file or URL is a source literal (SS020).",
+    "id": "_about"
+  },
+  {
+    "id": "e2b", "name": "Gemma 4 E2B", "enabled": true,
+    "version": 1, "kind": "model", "format": "litertlm", "role": "assistant",
+    "modality": "text·image·audio·video", "displayName": "Gemma 4 E2B", "approxSize": "2.6 GB",
+    "file": "gemma-4-E2B-it.litertlm",
+    "url": "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm",
+    "minBytes": 2000000000, "isDefault": true, "tools": true, "thinking": true,
+    "sampler": { "type": "topP", "topK": 40, "topP": 0.95, "temperature": 0.3, "seed": 0 }
+  },
+  {
+    "id": "e4b", "name": "Gemma 4 E4B", "enabled": false,
+    "version": 1, "kind": "model", "format": "litertlm", "role": "assistant",
+    "modality": "text·image·audio·video", "displayName": "Gemma 4 E4B", "approxSize": "3.66 GB",
+    "file": "gemma-4-E4B-it.litertlm",
+    "url": "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it.litertlm",
+    "minBytes": 3000000000, "heavyForLowRam": true, "tools": true, "thinking": true,
+    "sampler": { "type": "topP", "topK": 40, "topP": 0.95, "temperature": 0.3, "seed": 0 }
+  },
+  {
+    "id": "qwen3-4b-coder", "name": "Qwen3-4B Coder", "enabled": false,
+    "version": 1, "kind": "model", "format": "litertlm", "role": "coder",
+    "modality": "text", "displayName": "Qwen3-4B Instruct (coder)", "approxSize": "~2.5 GB",
+    "repo": "litert-community/Qwen3-4B-Instruct-2507",
+    "note": "text-only coding profile; swap in for code work (no file field -> not in the loadable projection until present)",
+    "tools": true, "thinking": true
+  },
+  {
+    "id": "kokoro", "name": "Kokoro TTS", "enabled": false,
+    "version": 1, "kind": "model", "role": "tts", "format": "onnx",
+    "file": "models/kokoro-v1.0.onnx",
+    "url": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/onnx/model.onnx",
+    "minBytes": 80000000
+  }
+]

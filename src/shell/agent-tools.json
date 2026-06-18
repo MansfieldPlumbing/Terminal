@@ -1,0 +1,108 @@
+[
+  {
+    "name": "get_battery",
+    "chip": "🔋 Battery?",
+    "description": "Get the phone's current battery level (percent), charging state, temperature and voltage.",
+    "parameters": { "type": "object", "properties": {}, "required": [] },
+    "command": "Get-AndroidBattery"
+  },
+  {
+    "name": "set_flashlight",
+    "chip": "🔦 Flashlight",
+    "description": "Turn the phone flashlight (torch) on or off, or toggle it.",
+    "parameters": { "type": "object", "properties": { "state": { "type": "string", "description": "One of On, Off, or Toggle", "enum": ["On", "Off", "Toggle"] } }, "required": ["state"] },
+    "command": "Set-Flashlight -State $ToolArgs.state"
+  },
+  {
+    "name": "send_morse",
+    "chip": "✨ Flash a message",
+    "description": "Blink a short text message in Morse code on the phone's flashlight. Use for fun, signalling, or device-to-device light chat. Keep the text short (a few words) — Morse is slow.",
+    "parameters": { "type": "object", "properties": { "text": { "type": "string", "description": "The text to flash in Morse (letters, digits, basic punctuation)." } }, "required": ["text"] },
+    "command": "Send-Morse -Text $ToolArgs.text"
+  },
+  {
+    "name": "get_memory",
+    "chip": "🧠 Memory",
+    "description": "Get the device RAM usage and total capacity.",
+    "parameters": { "type": "object", "properties": {}, "required": [] },
+    "command": "Get-AndroidMemory"
+  },
+  {
+    "name": "set_volume",
+    "chip": "🔊 Volume",
+    "description": "Set a system audio volume stream to a level.",
+    "parameters": { "type": "object", "properties": { "stream": { "type": "string", "description": "Media, Ring, or Alarm", "enum": ["Media", "Ring", "Alarm"] }, "level": { "type": "integer", "description": "Target volume level" } }, "required": ["stream", "level"] },
+    "command": "Set-AndroidVolume -Stream $ToolArgs.stream -Level $ToolArgs.level"
+  },
+  {
+    "name": "notify",
+    "description": "Show a system notification (heads-up) to the user with a title and body text.",
+    "parameters": { "type": "object", "properties": { "title": { "type": "string" }, "text": { "type": "string" } }, "required": ["title", "text"] },
+    "command": "Send-AndroidNotification -Title $ToolArgs.title -Text $ToolArgs.text"
+  },
+  {
+    "name": "vibrate",
+    "chip": "📳 Vibrate",
+    "description": "Vibrate the phone for a short duration in milliseconds.",
+    "parameters": { "type": "object", "properties": { "ms": { "type": "integer", "description": "Duration in milliseconds (default 200)" } }, "required": [] },
+    "command": "Invoke-Vibration -Duration $ToolArgs.ms"
+  },
+  {
+    "name": "get_network",
+    "chip": "📶 Network",
+    "description": "Get the phone's network status — Wi-Fi/cellular, SSID, IP.",
+    "parameters": { "type": "object", "properties": {}, "required": [] },
+    "command": "Get-AndroidNetwork"
+  },
+  {
+    "name": "get_storage",
+    "chip": "💾 Storage",
+    "description": "Get device storage usage (free/total).",
+    "parameters": { "type": "object", "properties": {}, "required": [] },
+    "command": "Get-AndroidStorage"
+  },
+  {
+    "name": "list_apps",
+    "chip": "📱 My apps",
+    "description": "List installed apps on the phone.",
+    "parameters": { "type": "object", "properties": {}, "required": [] },
+    "command": "Get-InstalledApp"
+  },
+  {
+    "name": "rd_consult",
+    "description": "Ask a more powerful online AI a question you can't answer on your own, and get its answer back. Use only when the user wants up-to-date or deep info beyond your local knowledge.",
+    "parameters": { "type": "object", "properties": { "question": { "type": "string", "description": "The question to ask the online AI" } }, "required": ["question"] },
+    "command": "Invoke-RdConsult -Question $ToolArgs.question"
+  },
+  {
+    "name": "offer_choices",
+    "description": "Offer the user a few tappable follow-up choices, shown as chips above the input. Use after answering when there are natural next things the user might want to do or ask. Give 2–5 short choices, each phrased as the message that will be sent if tapped.",
+    "parameters": { "type": "object", "properties": { "choices": { "type": "array", "items": { "type": "string" }, "description": "2–5 short tappable suggestions, each the literal message to send when tapped." } }, "required": ["choices"] },
+    "command": "ConvertTo-Json -Compress -InputObject @($ToolArgs.choices)"
+  },
+  {
+    "name": "make_card",
+    "description": "Create a live widget card on the user's desktop (the Surface). A card is an Adaptive Card JSON template plus an optional PowerShell command whose JSON result fills the template's ${property} bindings. Use simple ${name} bindings that match the command's output properties. Set place=true to put it on the desktop immediately.",
+    "parameters": { "type": "object", "properties": {
+      "id": { "type": "string", "description": "Card id: lowercase letters/digits/dashes, 2-32 chars, e.g. 'uptime'" },
+      "name": { "type": "string", "description": "Display name, e.g. 'Uptime'" },
+      "template": { "type": "string", "description": "The Adaptive Card JSON as a STRING: {\"type\":\"AdaptiveCard\",\"version\":\"1.5\",\"body\":[...]} with ${property} bindings" },
+      "command": { "type": "string", "description": "PowerShell that outputs an object whose properties fill the template bindings (optional for static cards)" },
+      "refresh_seconds": { "type": "integer", "description": "Auto-refresh interval (0 = manual)" },
+      "place": { "type": "boolean", "description": "true = also place it on the desktop now" }
+    }, "required": ["id", "name", "template"] },
+    "command": "New-Card -Id $ToolArgs.id -Name $ToolArgs.name -Template $ToolArgs.template -Command ([string]$ToolArgs.command) -RefreshSeconds ([int]$ToolArgs.refresh_seconds) -Place:([bool]$ToolArgs.place)"
+  },
+  {
+    "name": "remove_card",
+    "description": "Remove a card you previously made from the desktop and the registry, by its id.",
+    "parameters": { "type": "object", "properties": { "id": { "type": "string", "description": "The card id to remove" } }, "required": ["id"] },
+    "command": "Remove-Card -Id $ToolArgs.id"
+  },
+  {
+    "name": "run_powershell",
+    "description": "Run a PowerShell command in the on-device Subsystem runspace and get its JSON result. Use this for anything not covered by a dedicated tool — listing processes, packages, files, network, launching apps, or any Android cmdlet (Get-AndroidNetwork, Get-InstalledApp, Start-AndroidIntent, etc.).",
+    "parameters": { "type": "object", "properties": { "command": { "type": "string", "description": "The PowerShell command to execute" } }, "required": ["command"] },
+    "command": "Invoke-Expression $ToolArgs.command"
+  }
+]

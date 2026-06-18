@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <!-- interactive-widget=resizes-content: when the soft keyboard opens, RESIZE the viewport (so the
+       fixed shell chrome — taskbar/red-X — re-fits above the IME) instead of the default resizes-visual,
+       which PANS the page and flings the fixed taskbar off-screen. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no, interactive-widget=resizes-content">
+  <title>Subsystem</title>
+
+  <!-- Diagnostic sink + bugcheck FIRST: window.Dg and the global fault hooks must exist before any other
+       script runs, so a fault during boot is recorded and lost truth halts to the stop screen, not a swallow. -->
+  <script src="/lib/dg.js"></script>
+  <!-- Theme contract: theme.css declares the vars, themes.js paints the active named theme. -->
+  <link rel="stylesheet" href="/theme.css">
+  <script src="/themes.js"></script>
+
+  <!-- The Shell's own chrome + each chrome object's styles. -->
+  <link rel="stylesheet" href="/shell/Shell.css">
+  <link rel="stylesheet" href="/objects/Taskbar/Taskbar.css">
+  <link rel="stylesheet" href="/objects/Menu/Menu.css">
+  <link rel="stylesheet" href="/objects/Charms/Charms.css">
+  <link rel="stylesheet" href="/objects/TaskView/TaskView.css">
+</head>
+<body>
+  <div id="shell-root"></div>
+
+  <!-- index.html is nothing but a bootstrap: it boots the assembler. Everything else is an Object
+       resolved from the registry. -->
+  <script type="module">
+    import { Shell } from '/shell/Shell.js';
+    const shell = new Shell(document.getElementById('shell-root'));
+    window.Shell = shell;            // dev handle
+    shell.boot();
+  </script>
+</body>
+</html>

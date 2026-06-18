@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The adaptive icon: the Mansfield Plumbing manhole cover — black engraving linework on the
+     standard white plate (the Android icon-in-white-squircle convention). Rasterized from the author's vector
+     at 5 densities with the 64% safe-zone inset baked in (the source vector's one mega-path exceeds
+     aapt2's 32KB string limit and uses global winding cancellation, so it cannot ship split; the
+     PNGs are pixel-faithful). The launcher masks it round/squircle; the monochrome layer gives
+     Android 13+ themed icons the same line art via its alpha, system-tinted. Every door alias
+     inherits it until doors get their own glyphs. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/appicon_fg" />
+    <monochrome android:drawable="@mipmap/appicon_fg" />
+</adaptive-icon>

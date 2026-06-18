@@ -1,0 +1,74 @@
+/* Menu.css — the cascading namespace-presenter flyout. THEME VARS ONLY. The full-screen host is
+   click-through; only the flyout catches pointer events. Slide chrome from android-terminal. */
+
+.object-menu { position: fixed; inset: 0; z-index: 500; pointer-events: none; }
+
+.menu-flyout {
+  position: absolute;
+  top: 60px;
+  left: 8px;
+  width: 220px;
+  max-height: calc(100vh - 76px);
+  overflow-y: auto;            /* scroll when the menu extends past the screen */
+  overflow-x: hidden;          /* keep horizontal clipped so the cascade slide stays clean */
+  pointer-events: auto;
+  background-color: rgba(var(--mica-rgb), calc(var(--mica-strong-opacity) * var(--transparency)));
+  backdrop-filter: blur(var(--mica-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--mica-blur)) saturate(180%);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  font-family: var(--font-sans);
+}
+/* Taskbar docked bottom -> flyout opens upward from the trigger. */
+#shell-root[data-bar="bottom"] .menu-flyout { top: auto; bottom: 60px; }
+
+.menu-flyout[hidden] { display: none; }
+
+.menu-stack { position: relative; overflow: hidden; }
+.menu-panel { display: flex; flex-direction: column; }
+.menu-panel.enter-right { animation: menu-in-right .18s cubic-bezier(0.16,1,0.3,1); }
+.menu-panel.enter-left  { animation: menu-in-left  .18s cubic-bezier(0.16,1,0.3,1); }
+@keyframes menu-in-right { from { transform: translateX(20px);  opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes menu-in-left  { from { transform: translateX(-20px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.menu-sep { height: 1px; background: var(--border); margin: 6px 8px; }
+.menu-section-title {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+  color: var(--muted); padding: 8px 12px 4px;
+}
+.menu-empty { padding: 8px 12px; font-size: 13px; color: var(--muted); font-style: italic; }
+
+.menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg);
+  text-align: left;
+  font-size: 13px;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: background-color .12s ease;
+}
+.menu-item:hover { background-color: rgba(255, 255, 255, 0.08); }
+.menu-item:active { transform: scale(0.99); }
+.menu-item-danger { color: var(--accent-2); }
+.menu-item-disabled { opacity: 0.4; pointer-events: none; }
+
+.menu-item-icon { width: 18px; text-align: center; flex: 0 0 auto; font-family: var(--font-mono); color: var(--accent); }
+/* Dock arrow — glows blue (accent), the same accent-glow language as the agent chat affordances. */
+.menu-dock .menu-item-icon {
+  color: var(--accent);
+  text-shadow: 0 0 8px var(--accent), 0 0 2px var(--accent);
+  font-size: 15px;
+  font-weight: 700;
+}
+.menu-dock:hover .menu-item-icon { text-shadow: 0 0 12px var(--accent), 0 0 4px var(--accent); }
+.menu-item-label { flex: 1 1 auto; }
+.menu-item-chevron { flex: 0 0 auto; font-family: var(--font-mono); color: var(--muted); font-size: 12px; }

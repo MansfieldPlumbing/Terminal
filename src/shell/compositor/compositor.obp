@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+  <title>Compositor</title>
+  <link rel="stylesheet" href="/theme.css">
+  <script src="/themes.js"></script>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+    #stage { position: fixed; inset: 0; }
+    /* DOM cards ride ON TOP of the GPU canvas, pinned to their quad by the synchronizer. They're real DOM
+       (live, themeable, legible) — this is the "DOM near the lens" face of an object. */
+    .dom-card {
+      position: absolute; top: 0; left: 0; box-sizing: border-box;
+      border-radius: 14px; overflow: hidden; will-change: transform;
+      background: var(--surface); color: var(--fg); border: 1px solid var(--border);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35); font-family: var(--font-sans);
+      display: flex; flex-direction: column; padding: 12px; gap: 6px;
+    }
+    .dom-card h3 { margin: 0; font-size: 14px; }
+    .dom-card p  { margin: 0; font-size: 12px; color: var(--muted); }
+    .dom-card input { background: rgba(127,127,127,.18); border: 1px solid var(--border); color: var(--fg); border-radius: 8px; padding: 6px 8px; font: inherit; }
+    #hud { position: fixed; left: 12px; bottom: 12px; z-index: 10; font: 12px var(--font-mono); color: var(--fg); background: rgba(0,0,0,.4); padding: 6px 10px; border-radius: 8px; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="stage"></div>
+  <div id="hud"></div>
+
+  <script type="module">
+    import { Compositor } from '/compositor/engine.js';
+
+    const stage = document.getElementById('stage');
+    const cx = new Compositor();
+    window.__cx = cx;
+    const ok = await cx.mount(stage).catch(e => { window.__mountErr = String(e && e.stack || e); return false; });
+
+    if (ok) {
+      // Seed a loose garden of procedural GPU tiles across the infinite plane (world coords; pan to find them).
+      const palette = [[0.16,0.5,0.85],[0.85,0.16,0.45],[0.12,0.72,0.45],[0.95,0.6,0.18],[0.55,0.35,0.9],[0.2,0.7,0.85]];
+      let n = 0;
+      for (let gy = 0; gy < 4; gy++) {
+        for (let gx = 0; gx < 4; gx++) {
+          const c = palette[n % palette.length]; n++;
+          cx.add({ x: 0.12 + gx * 0.22, y: 0.12 + gy * 0.22, w: 0.18, h: 0.16, r: c[0], g: c[1], b: c[2] });
+        }
+      }
+
+      // THE SMOKE TEST: one real DOM card welded to a GPU quad. Its quad is dimmed (it's the "proxy"); the
+      // live DOM rides on top, pinned every frame by the camera math. Pan around — if it tracks pixel-perfect
+      // through drags, the DOM↔GPU handoff alignment holds in this WebView. That's the sandbox edge we map.
+      const domQuad = cx.add({ x: 0.30, y: 0.30, w: 0.34, h: 0.26, r: 0.10, g: 0.11, b: 0.13, a: 0.5 });
+      const card = document.createElement('div');
+      card.className = 'dom-card';
+      card.innerHTML = '<h3>Live DOM card</h3><p>Real, themeable, legible. Pinned to a GPU quad.</p><input placeholder="type — focus works too">';
+      stage.appendChild(card);
+
+      cx.onWorldChange((c) => {
+        const rect = c.canvas.getBoundingClientRect();
+        const left = (domQuad.x - c.camera.x) * rect.width;
+        const top  = (domQuad.y - c.camera.y) * rect.height;
+        card.style.width  = (domQuad.w * rect.width) + 'px';
+        card.style.height = (domQuad.h * rect.height) + 'px';
+        card.style.transform = `translate(${left}px, ${top}px)`;
+      });
+    }
+  </script>
+</body>
+</html>

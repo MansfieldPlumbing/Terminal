@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <base href="/">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Files</title>
+
+    <link rel="stylesheet" href="/theme.css">
+    <script src="/themes.js"></script>
+    <script src="/shell/presenter.js"></script>
+
+    <style>
+        * { box-sizing: border-box; }
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background: var(--bg); color: var(--fg);
+            font-family: var(--font-sans); overflow: hidden;
+            user-select: none; -webkit-user-select: none;
+            font-size: 13px;
+        }
+
+        /* Layout */
+        .app { display: flex; flex-direction: column; height: 100%; }
+
+        /* Header / Address Bar */
+        .header {
+            display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+            background: var(--surface); border-bottom: 1px solid var(--border);
+            flex-shrink: 0; height: 48px;
+        }
+        .icon-btn {
+            background: transparent; border: none; color: var(--fg);
+            width: 32px; height: 32px; border-radius: 6px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: background 0.15s;
+        }
+        .icon-btn:hover { background: rgba(255, 255, 255, 0.08); }
+        .icon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        .address-bar {
+            flex: 1; display: flex; align-items: center;
+            background: var(--bg); border: 1px solid var(--border);
+            border-radius: 6px; padding: 0 12px; height: 32px;
+            transition: border-color 0.15s;
+        }
+        .address-bar:focus-within { border-color: var(--accent); }
+        .address-bar input {
+            flex: 1; background: transparent; border: none; color: var(--fg);
+            outline: none; font-size: 13px; font-family: var(--font-sans);
+        }
+
+        /* Toolbar */
+        .toolbar {
+            display: flex; align-items: center; gap: 4px; padding: 6px 12px;
+            background: var(--surface); border-bottom: 1px solid var(--border);
+            flex-shrink: 0; height: 40px; overflow-x: auto;
+        }
+        .toolbar::-webkit-scrollbar { display: none; }
+        .tool-btn {
+            background: transparent; border: none; color: var(--fg);
+            display: flex; align-items: center; gap: 6px; padding: 6px 10px;
+            border-radius: 6px; cursor: pointer; transition: background 0.15s;
+            white-space: nowrap; font-size: 12px; font-weight: 500;
+        }
+        .tool-btn:hover { background: rgba(255, 255, 255, 0.08); }
+        .tool-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .tool-btn.danger:hover:not(:disabled) { color: var(--error); background: color-mix(in srgb, var(--error) 15%, transparent); }
+        .divider { width: 1px; height: 16px; background: var(--border); margin: 0 4px; }
+
+        /* Main File List */
+        .main-view { flex: 1; overflow-y: auto; background: var(--bg); position: relative; }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        thead { position: sticky; top: 0; background: var(--surface); z-index: 10; box-shadow: 0 1px 0 var(--border); }
+        th { padding: 8px 12px; font-weight: 500; color: var(--muted); cursor: pointer; }
+        th:hover { background: rgba(255,255,255,0.04); color: var(--fg); }
+
+        tr.item-row { border-bottom: 1px solid transparent; cursor: pointer; }
+        tr.item-row:hover { background: rgba(255,255,255,0.04); }
+        tr.item-row.selected { background: color-mix(in srgb, var(--accent) 15%, transparent); border-bottom-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+        td { padding: 8px 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+        .td-name { display: flex; align-items: center; gap: 8px; font-weight: 500; color: var(--fg); }
+        .td-date, .td-size { color: var(--muted); font-family: var(--font-mono); font-size: 12px; }
+
+        .empty-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--muted); gap: 12px; }
+
+        /* NF glyph icons — CaskaydiaCove NF via --font-mono; no icon library (entities, ASCII-safe). */
+        .nf { font-family: var(--font-mono); font-style: normal; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+
+        /* Status Bar */
+        .status-bar {
+            height: 28px; background: var(--surface); border-top: 1px solid var(--border);
+            display: flex; align-items: center; padding: 0 12px; font-size: 11px; color: var(--muted);
+            justify-content: space-between; flex-shrink: 0;
+        }
+
+        /* Name prompt (the WebView has no window.prompt — a themed inline modal instead) */
+        .modal-veil {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+            display: none; align-items: center; justify-content: center; z-index: 100;
+        }
+        .modal-veil.open { display: flex; }
+        .modal {
+            background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+            padding: 16px; min-width: 260px; max-width: 80vw;
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        .modal h3 { margin: 0; font-size: 13px; font-weight: 600; color: var(--fg); }
+        .modal input {
+            background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+            color: var(--fg); padding: 8px 10px; font-size: 13px; outline: none;
+            font-family: var(--font-sans);
+        }
+        .modal input:focus { border-color: var(--accent); }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+        .modal-actions button {
+            border: 1px solid var(--border); background: transparent; color: var(--fg);
+            padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px;
+        }
+        .modal-actions button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 12px; height: 12px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border: 3px solid var(--bg); border-radius: 6px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <div class="header">
+            <button class="icon-btn" id="btn-up" title="Up one level"><span class="nf" style="font-size:15px">&#xf062;</span></button>
+            <button class="icon-btn" id="btn-refresh" title="Refresh"><span class="nf" style="font-size:14px">&#xf021;</span></button>
+            <div class="address-bar">
+                <input type="text" id="path-input" spellcheck="false" autocomplete="off">
+            </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="toolbar">
+            <button class="tool-btn" id="btn-new-folder"><span class="nf" style="color:var(--accent)">&#xf07b;</span> New Folder</button>
+            <button class="tool-btn" id="btn-new-file"><span class="nf">&#xf15b;</span> New File</button>
+            <div class="divider"></div>
+            <button class="tool-btn" id="btn-rename" disabled><span class="nf">&#xf040;</span> Rename</button>
+            <button class="tool-btn danger" id="btn-delete" disabled><span class="nf">&#xf1f8;</span> Delete</button>
+        </div>
+
+        <!-- Main View -->
+        <div class="main-view" id="main-view">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 50%" id="sort-name">Name</th>
+                        <th style="width: 30%" id="sort-date">Date Modified</th>
+                        <th style="width: 20%" id="sort-size">Size</th>
+                    </tr>
+                </thead>
+                <tbody id="file-list">
+                    <!-- Injected rows -->
+                </tbody>
+            </table>
+            <div class="empty-state" id="empty-state" style="display: none;">
+                <span class="nf" style="font-size:42px;opacity:0.3">&#xf07c;</span>
+                <span>This folder is empty.</span>
+            </div>
+            <div class="empty-state" id="loading-state">
+                <span>Loading...</span>
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div class="status-bar">
+            <span id="status-text">0 items</span>
+            <span id="status-error" style="color:var(--error)"></span>
+        </div>
+    </div>
+
+    <!-- Name prompt -->
+    <div class="modal-veil" id="modal-veil">
+        <div class="modal">
+            <h3 id="modal-title">Name</h3>
+            <input type="text" id="modal-input" spellcheck="false" autocomplete="off">
+            <div class="modal-actions">
+                <button id="modal-cancel">Cancel</button>
+                <button class="primary" id="modal-ok">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { PsrpSession } from '/lib/psrp.js';
+        import { Splash } from '/lib/splash.js';
+        import { downloadBase64, downloadVomLane, shareTextOut } from '/lib/download.js';
+
+        // The backend is the SHARED PSRP lane (lib/psrp.js → /psrp → Rs → one multiplexed remote
+        // runspace over the Subsystem.Psrp named pipe) — stateless: every path crosses the seam as
+        // a parameter value, never interpolated into PowerShell text, and no runspace state is held.
+        const psrp = new PsrpSession('files', { shared: true });
+        let firstLoad = true;
+
+        // State
+        let currentPath = '/sdcard';
+        let items = [];
+        let selectedItem = null; // Only single selection for simplicity right now
+        let sortCol = 'name';
+        let sortAsc = true;
+
+        // UI Elements
+        const elPathInput = document.getElementById('path-input');
+        const elFileList = document.getElementById('file-list');
+        const elEmptyState = document.getElementById('empty-state');
+        const elLoadingState = document.getElementById('loading-state');
+        const elStatusText = document.getElementById('status-text');
+        const elStatusErr = document.getElementById('status-error');
+
+        // Buttons
+        const btnUp = document.getElementById('btn-up');
+        const btnRefresh = document.getElementById('btn-refresh');
+        const btnNewFolder = document.getElementById('btn-new-folder');
+        const btnNewFile = document.getElementById('btn-new-file');
+        const btnRename = document.getElementById('btn-rename');
+        const btnDelete = document.getElementById('btn-delete');
+
+        // Helpers
+        const joinPath = (dir, name) => `${dir}/${name}`.replace(/\/+/g, '/');
+        const formatSize = (bytes) => {
+            if (bytes == null || isNaN(bytes)) return '--';
+            if (bytes === 0) return '0 B';
+            const k = 1024, sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        };
+        const showError = (err) => { elStatusErr.textContent = String(err.message || err).substring(0, 80); };
+        const flashOk = (msg) => {
+            elStatusErr.style.color = 'var(--success)';
+            elStatusErr.textContent = msg;
+            setTimeout(() => { elStatusErr.textContent = ''; elStatusErr.style.color = 'var(--error)'; }, 3000);
+        };
+
+        // Name prompt (no window.prompt in this WebView)
+        const elVeil = document.getElementById('modal-veil');
+        const elModalTitle = document.getElementById('modal-title');
+        const elModalInput = document.getElementById('modal-input');
+        function askName(title, initial = '') {
+            return new Promise((resolve) => {
+                elModalTitle.textContent = title;
+                elModalInput.value = initial;
+                elVeil.classList.add('open');
+                elModalInput.focus();
+                elModalInput.select();
+                const done = (value) => {
+                    elVeil.classList.remove('open');
+                    document.getElementById('modal-ok').onclick = null;
+                    document.getElementById('modal-cancel').onclick = null;
+                    elModalInput.onkeydown = null;
+                    resolve(value);
+                };
+                document.getElementById('modal-ok').onclick = () => done(elModalInput.value.trim() || null);
+                document.getElementById('modal-cancel').onclick = () => done(null);
+                elModalInput.onkeydown = (e) => {
+                    if (e.key === 'Enter') done(elModalInput.value.trim() || null);
+                    if (e.key === 'Escape') done(null);
+                };
+            });
+        }
+
+        // Core Load Logic
+        async function loadPath(path) {
+            currentPath = path;
+            elPathInput.value = path;
+            selectedItem = null;
+            updateUI();
+
+            elFileList.innerHTML = '';
+            elLoadingState.style.display = 'flex';
+            elEmptyState.style.display = 'none';
+            elStatusErr.textContent = '';
+            if (firstLoad) Splash.show('Connecting to the runspace…');
+
+            try {
+                const res = await psrp.invoke([
+                    { name: 'Get-ChildItem', parameters: { LiteralPath: path, Force: true, ErrorAction: 'Stop' } },
+                    { name: 'Select-Object', parameters: { Property: ['Name', 'Length', 'LastWriteTime', 'PSIsContainer'] } },
+                ]);
+
+                items = res.map(i => ({
+                    name: i.Name,
+                    isDir: !!i.PSIsContainer,
+                    size: i.Length || 0,
+                    date: i.LastWriteTime?.DateTime || i.LastWriteTime?.value || i.LastWriteTime || '',
+                    rawTime: new Date(i.LastWriteTime?.value || i.LastWriteTime || 0).getTime()
+                })).filter(i => i.name);
+                if (firstLoad) { firstLoad = false; Splash.done(); }
+
+            } catch (err) {
+                items = [];
+                if (firstLoad) {
+                    // First contact failed (backend down / capability disabled) — full splash error
+                    // with retry, not a blank table.
+                    Splash.fail(String(err.message || err), () => loadPath(currentPath));
+                } else {
+                    showError(err);
+                }
+            }
+
+            elLoadingState.style.display = 'none';
+            renderTable();
+        }
+
+        // Table Rendering & Sorting
+        function renderTable() {
+            // Sort
+            items.sort((a, b) => {
+                if (a.isDir !== b.isDir) return a.isDir ? -1 : 1; // Folders always first
+                let cmp = 0;
+                if (sortCol === 'name') cmp = a.name.localeCompare(b.name);
+                else if (sortCol === 'date') cmp = a.rawTime - b.rawTime;
+                else if (sortCol === 'size') cmp = a.size - b.size;
+                return sortAsc ? cmp : -cmp;
+            });
+
+            elEmptyState.style.display = items.length === 0 ? 'flex' : 'none';
+            elStatusText.textContent = `${items.length} items${psrp.id ? ' · psrp:' + psrp.id : ''}`;
+            elFileList.innerHTML = '';
+
+            items.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = `item-row ${selectedItem === item.name ? 'selected' : ''}`;
+
+                const icon = item.isDir ? '<span class="nf" style="color:var(--accent)">&#xf07b;</span>' : '<span class="nf" style="color:var(--muted)">&#xf15b;</span>';
+                const dateStr = item.date ? new Date(item.date).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '--';
+
+                tr.innerHTML = `
+                    <td class="td-name">${icon} <span></span></td>
+                    <td class="td-date">${dateStr}</td>
+                    <td class="td-size">${item.isDir ? '--' : formatSize(item.size)}</td>
+                `;
+                tr.querySelector('.td-name span').textContent = item.name;
+
+                tr.onclick = () => {
+                    selectedItem = item.name;
+                    renderTable();
+                    updateUI();
+                };
+
+                tr.ondblclick = () => {
+                    const fullPath = joinPath(currentPath, item.name);
+                    if (item.isDir) {
+                        loadPath(fullPath);
+                    } else {
+                        // Open by id; the file rides along as the object param (Shell.open(id, params)).
+                        try {
+                            if (window.parent && window.parent.Shell) {
+                                window.parent.Shell.open('edit', { file: fullPath });
+                            }
+                        } catch (e) { console.error(e); }
+                    }
+                };
+
+                elFileList.appendChild(tr);
+            });
+        }
+
+        function updateUI() {
+            btnUp.disabled = currentPath === '/' || currentPath === '';
+            btnRename.disabled = !selectedItem;
+            btnDelete.disabled = !selectedItem;
+            publishMenu();
+        }
+
+        // Actions
+        btnUp.onclick = () => {
+            const parts = currentPath.split('/').filter(Boolean);
+            parts.pop();
+            loadPath('/' + parts.join('/'));
+        };
+
+        btnRefresh.onclick = () => loadPath(currentPath);
+
+        elPathInput.onkeydown = (e) => {
+            if (e.key === 'Enter') loadPath(elPathInput.value.trim() || '/');
+        };
+
+        // Sorting Headers
+        ['name', 'date', 'size'].forEach(col => {
+            document.getElementById(`sort-${col}`).onclick = () => {
+                if (sortCol === col) sortAsc = !sortAsc;
+                else { sortCol = col; sortAsc = true; }
+                renderTable();
+            };
+        });
+
+        // --- Mutations: structured PSRP commands; names/paths are parameter DATA ---
+        async function runMutation(commands) {
+            elLoadingState.style.display = 'flex';
+            try {
+                await psrp.invoke(commands);
+            } catch (err) {
+                showError(err);
+            }
+            loadPath(currentPath);
+        }
+
+        async function newItem(itemType) {
+            const name = await askName(itemType === 'Directory' ? 'New folder name' : 'New file name');
+            if (!name) return;
+            runMutation([{ name: 'New-Item', parameters: {
+                Path: currentPath, Name: name, ItemType: itemType, ErrorAction: 'Stop'
+            } }]);
+        }
+
+        async function renameSelected() {
+            if (!selectedItem) return;
+            const name = await askName('Rename to', selectedItem);
+            if (!name || name === selectedItem) return;
+            runMutation([{ name: 'Rename-Item', parameters: {
+                LiteralPath: joinPath(currentPath, selectedItem), NewName: name, ErrorAction: 'Stop'
+            } }]);
+        }
+
+        function deleteSelected() {
+            if (!selectedItem) return;
+            const item = items.find(i => i.name === selectedItem);
+            if (!confirm(`Delete "${selectedItem}"${item?.isDir ? ' and everything in it' : ''}?`)) return;
+            runMutation([{ name: 'Remove-Item', parameters: {
+                LiteralPath: joinPath(currentPath, selectedItem),
+                Recurse: !!item?.isDir, Force: true, ErrorAction: 'Stop'
+            } }]);
+        }
+
+        btnNewFolder.onclick = () => newItem('Directory');
+        btnNewFile.onclick = () => newItem('File');
+        btnRename.onclick = renameSelected;
+        btnDelete.onclick = deleteSelected;
+
+        // Download rides THE BYTE LANE: the backend stages the file as a Float32 VOM region
+        // (Publish-SsFileLane — a real, refcounted kernel handle) and the WebView pulls it over the
+        // CoreCLR→WebView interop (vom:// / /vom/), binary end to end. The lane is released
+        // explicitly (free-at-zero). Base64-over-JSON survives only as the grounded fallback.
+        const DOWNLOAD_CAP = 64 * 1024 * 1024;
+        async function downloadSelected() {
+            const item = items.find(i => i.name === selectedItem);
+            if (!item || item.isDir) return;
+            if (item.size > DOWNLOAD_CAP) { showError(new Error('File too large to download here.')); return; }
+            const fullPath = joinPath(currentPath, item.name);
+            try {
+                const staged = (await psrp.invoke([{ name: 'Publish-SsFileLane', parameters: {
+                    LiteralPath: fullPath
+                } }]))[0];
+                try {
+                    await downloadVomLane(item.name, staged.Handle, staged.Size);
+                    flashOk(`Downloaded ${item.name}`);
+                } finally {
+                    psrp.invoke([{ name: 'Close-SsFileLane', parameters: { Handle: staged.Handle } }])
+                        .catch(() => {});
+                }
+            } catch (err) {
+                // GRACEFUL DEGRADATION LADDER (the user's directive — "android message or base64 rn"):
+                // VOM Float32 lane → base64-over-JSON → Android system share. Each rung is a real,
+                // working transport; we step down only when the rung above is unavailable.
+                if (item.size <= 24 * 1024 * 1024) {
+                    try {
+                        const res = await psrp.invoke([{ name: 'ConvertTo-SsBase64', parameters: { LiteralPath: fullPath } }]);
+                        if (res[0]) { downloadBase64(item.name, res[0]); flashOk(`Downloaded ${item.name}`); return; }
+                    } catch (err2) { /* fall to the share rung */ }
+                }
+                // Final rung: for text-ish files, hand the content to the Android chooser (out of the
+                // glass cage) rather than failing. Binary/large that can't ride either lane surfaces.
+                const textish = /\.(txt|md|json|log|ps1|psm1|csv|xml|ini|ssr|yml|yaml|sh|cs|js|html|css)$/i.test(item.name);
+                if (textish && item.size <= 2 * 1024 * 1024) {
+                    try {
+                        const res = await psrp.invoke([{ name: 'Get-Content', parameters: { LiteralPath: fullPath, Raw: true } }]);
+                        if (res[0] != null && shareTextOut(item.name, String(res[0]), 'text/plain')) { flashOk(`Shared ${item.name}`); return; }
+                    } catch (err3) { /* surface the original error below */ }
+                }
+                showError(err);
+            }
+        }
+
+        // --- Shell menu: contribute verbs; the Menu presents them (REGISTRY-SPEC §6/§8) ---
+        function publishMenu() {
+            if (!window.Presenter) return;
+            const sel = items.find(i => i.name === selectedItem);
+            Presenter.menu('files', [
+                { menu: 'file', verb: 'new-folder', label: 'New Folder' },
+                { menu: 'file', verb: 'new-file',   label: 'New File' },
+                { menu: 'file', verb: 'download',   label: 'Download', enabled: !!sel && !sel.isDir },
+                { menu: 'edit', verb: 'rename',     label: 'Rename', enabled: !!selectedItem },
+                { menu: 'edit', verb: 'delete',     label: 'Delete', enabled: !!selectedItem },
+                { menu: 'view', verb: 'refresh',    label: 'Refresh' },
+                { menu: 'view', verb: 'up',         label: 'Up One Level', enabled: !(currentPath === '/' || currentPath === '') },
+            ]);
+        }
+        if (window.Presenter) Presenter.onVerb((verb) => {
+            if (verb === 'new-folder') newItem('Directory');
+            else if (verb === 'new-file') newItem('File');
+            else if (verb === 'download') downloadSelected();
+            else if (verb === 'rename') renameSelected();
+            else if (verb === 'delete') deleteSelected();
+            else if (verb === 'refresh') loadPath(currentPath);
+            else if (verb === 'up') btnUp.onclick();
+        });
+
+        // Boot
+        loadPath(currentPath);
+    </script>
+</body>
+</html>

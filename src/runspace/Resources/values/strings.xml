@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Subsystem</string>
+    <string name="app_text">Hello, Android!</string>
+    <string name="accessibility_service_description">Subsystem</string>
+    <string name="wp_description">Subsystem shader wallpapers — the registry catalog, live on the home screen</string>
+</resources>
+
+

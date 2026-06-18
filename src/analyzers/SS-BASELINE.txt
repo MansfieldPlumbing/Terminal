@@ -1,0 +1,289 @@
+SS003|AudioStreamCmdlets.cs|Static ConcurrentDictionary — a parallel store of truth; live objects belong in Vom handles, durable definitions in Cm rows
+SS003|Cm.cs|Static ConcurrentDictionary — a parallel store of truth; live objects belong in Vom handles, durable definitions in Cm rows
+SS003|HelpSystem.cs|Static Dictionary — a parallel store of truth; live objects belong in Vom handles, durable definitions in Cm rows
+SS003|ModelManager.cs|Static Dictionary — a parallel store of truth; live objects belong in Vom handles, durable definitions in Cm rows
+SS003|ModelManager.cs|Static Dictionary — a parallel store of truth; live objects belong in Vom handles, durable definitions in Cm rows
+SS003|NotificationService.cs|Static ConcurrentDictionary — a parallel store of truth; live objects belong in Vom handles, durable definitions in Cm rows
+SS003|ObpHost.cs|Static ConcurrentDictionary — a parallel store of truth; live objects belong in Vom handles, durable definitions in Cm rows
+SS003|ObpHost.cs|Static Dictionary — a parallel store of truth; live objects belong in Vom handles, durable definitions in Cm rows
+SS003|PackageInfoDb.cs|Static Dictionary — a parallel store of truth; live objects belong in Vom handles, durable definitions in Cm rows
+SS003|Pp.cs|Static Dictionary — a parallel store of truth; live objects belong in Vom handles, durable definitions in Cm rows
+SS003|Registrar.cs|Static Dictionary — a parallel store of truth; live objects belong in Vom handles, durable definitions in Cm rows
+SS003|Registrar.cs|Static Dictionary — a parallel store of truth; live objects belong in Vom handles, durable definitions in Cm rows
+SS003|Rs.cs|Static ConcurrentDictionary — a parallel store of truth; live objects belong in Vom handles, durable definitions in Cm rows
+SS003|ScreenStreamCmdlets.cs|Static ConcurrentDictionary — a parallel store of truth; live objects belong in Vom handles, durable definitions in Cm rows
+SS003|Sessions.cs|Static ConcurrentDictionary — a parallel store of truth; live objects belong in Vom handles, durable definitions in Cm rows
+SS003|WpService.cs|Static ConcurrentDictionary — a parallel store of truth; live objects belong in Vom handles, durable definitions in Cm rows
+SS007|Actuators.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Actuators.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Actuators.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Actuators.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|AdbConnection.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|AdbConnection.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|AgentSessionTable.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Build.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Build.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Build.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Build.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Build.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Cm.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Cm.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Cm.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Cm.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ConscryptAdbTransport.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ConscryptAdbTransport.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ConsoleHost.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ConsoleHost.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Git.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Hud.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Hud.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Hud.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Interactive.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Interactive.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|LiteRtRuntime.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|LiteRtRuntime.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|LiteRtRuntime.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|LiteRtRuntime.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|LiteRtRuntime.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|LiveMap.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|MainActivity.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|MainActivity.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|MainActivity.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|MainActivity.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|MainActivity.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|MainActivity.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|MainActivity.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|MainActivity.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|MainActivity.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|MainActivity.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|MainActivity.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|MainActivity.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|MainActivity.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|MainActivity.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|MainActivity.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|MainActivity.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|MainActivity.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|MainActivity.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|MainActivity.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ModelManager.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ModelManager.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ObQuery.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ObpHost.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|PackageInfoDb.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ProjectionServer.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Ps.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Ps.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Registrar.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ReplEngine.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ReplEngine.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ReplEngine.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ReplEngine.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ReplEngine.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Rs.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Rs.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|RuntimeBroker.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|RuntimeBroker.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|RuntimeBroker.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|ScreenStreamCmdlets.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|SelfSource.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Sessions.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|SpeechOutput.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|SpeechOutput.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|SqliteProbe.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|SubsystemApi.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|SubsystemApi.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|SubsystemApi.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|SubsystemRecognitionService.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|SubsystemService.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Surface.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Surface.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Surface.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Surface.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Surfaces.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Surfaces.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Surfaces.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Surfaces.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Surfaces.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Surfaces.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Surfaces.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Surfaces.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Surfaces.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|SystemWallpaperCmdlets.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|View.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Vom.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|Vom.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|WebViewDirectPortAdapter.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|WebViewDirectPortAdapter.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|WinDg.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|WpService.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|WpService.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|WpService.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS007|WpService.cs|Empty catch block — a failure must degrade AND report to Dg (/diag), never vanish silently
+SS009|AdbConnection.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|AdbConnection.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|AdbConnection.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|AdbConnection.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|AudioStreamCmdlets.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|MainActivity.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|MainActivity.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|ProjectionServer.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|ProjectionServer.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|ProjectionServer.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|ProjectionServer.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|ProjectionServer.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|ProjectionServer.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|ProjectionServer.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|ProjectionServer.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|ProjectionServer.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|ProjectionServer.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|ProjectionServer.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|ProjectionServer.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|ProjectionServer.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|ProjectionServer.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|ProjectionServer.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|ReplEngine.cs|new Thread spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|RuntimeBroker.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|ScreenStreamCmdlets.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|SubsystemApi.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|View.cs|Task.Run spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|View.cs|new Thread spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|WinShellUi.cs|new Thread spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS009|WpService.cs|new Thread spawns work the VOM does not own — no Sub-VOM, quota, or termination token; route it through Vom.Spawn (Ps) so it is owned, quota'd, and cancellable
+SS010|PeLoader.cs|Hardcoded POSIX path '/data/local/tmp' — absolute paths and endpoints are truth outside the registry; resolve by id from Cm (or a config record), not a literal
+SS011|AdbCommands.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|AdbConnection.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|AdbMdnsDiscoverer.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|AdbPairingClient.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|AgentDelta.cs|Namespace 'Subsystem.RuntimeBroker' segment 'RuntimeBroker' is not a registered component — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|AgentSessionTable.cs|Namespace 'Subsystem.RuntimeBroker' segment 'RuntimeBroker' is not a registered component — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|AgentSettings.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|AndroidPubKey.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|AndroidSubsystemHost.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|AnsiHighlighter.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|Broker.cs|Namespace 'Subsystem.RuntimeBroker' segment 'RuntimeBroker' is not a registered component — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|ConscryptAdbTransport.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|Dg.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|DumpsysTreeParser.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|Firewall.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|HelpSystem.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|Hud.cs|Namespace 'Subsystem.RuntimeBroker' segment 'RuntimeBroker' is not a registered component — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|IAdbTransport.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|InvokeAgentCmdlet.cs|Namespace 'Subsystem.RuntimeBroker.Cmdlets' segment 'RuntimeBroker' is not a registered component — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|LiteRtNative.cs|Namespace 'Subsystem.RuntimeBroker' segment 'RuntimeBroker' is not a registered component — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|LiteRtRuntime.cs|Namespace 'Subsystem.RuntimeBroker' segment 'RuntimeBroker' is not a registered component — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|ModelManager.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|ModelsApi.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|ObpHost.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|PackageInfoDb.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|PairAdbReceiver.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|ParserState.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|ProjectionServer.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|RbFault.cs|Namespace 'Subsystem.RuntimeBroker' segment 'RuntimeBroker' is not a registered component — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|Registrar.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|ReplEngine.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|Rs.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|Runtime.cs|Namespace 'Subsystem.RuntimeBroker' segment 'RuntimeBroker' is not a registered component — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|RuntimeBroker.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|ScheduledTaskTable.cs|Namespace 'Subsystem.RuntimeBroker' segment 'RuntimeBroker' is not a registered component — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|Sessions.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|Spake2.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|Spake25519Client.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|SqliteProbe.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|SubsystemAliases.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|SubsystemApi.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|ToolCatalog.cs|Namespace 'Subsystem.RuntimeBroker' segment 'RuntimeBroker' is not a registered component — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|Translator.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS011|VomInterop.cs|Namespace 'Subsystem' carries no component segment (root-only — the R1 folder=namespace debt) — registering a component in SystemCatalog.json is a deliberate event, never a PR side effect
+SS012|AdbMdnsDiscoverer.cs|Type 'DiscoveryListener' carries banned suffix 'Listener' — name the mechanism (approved suffixes live in SystemCatalog.json)
+SS012|AdbMdnsDiscoverer.cs|Type 'ResolveListener' carries banned suffix 'Listener' — name the mechanism (approved suffixes live in SystemCatalog.json)
+SS012|CapabilitiesHandler.cs|Type 'CapabilitiesHandler' carries banned suffix 'Handler' — name the mechanism (approved suffixes live in SystemCatalog.json)
+SS012|Handle.cs|Type 'Manifest' collides with a platform-reserved name (AOSP/Linux/NT) without inheriting it — LLM coders will conflate them
+SS012|Light.cs|Type 'Listener' carries banned suffix 'Listener' — name the mechanism (approved suffixes live in SystemCatalog.json)
+SS012|Pp.cs|Type 'IProvisioningHandler' carries banned suffix 'Handler' — name the mechanism (approved suffixes live in SystemCatalog.json)
+SS012|Pp.cs|Type 'ProbeHandler' carries banned suffix 'Handler' — name the mechanism (approved suffixes live in SystemCatalog.json)
+SS012|SessionCmdlets.cs|Type 'NewSessionCmdlet' encodes context 'New' in the name — context belongs to the handle/host, not the identifier
+SS012|SessionCmdlets.cs|Type 'SessionCmdletsHelper' carries banned suffix 'Helper' — name the mechanism (approved suffixes live in SystemCatalog.json)
+SS012|WrapperCmdlets.cs|Type 'NewAgentSessionCmdlet' encodes context 'New' in the name — context belongs to the handle/host, not the identifier
+SS014|Dg.cs|Dg may not reference component Cm ('Cm') — dependsOn: []; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|Dg.cs|Dg may not reference component Cm ('Cm') — dependsOn: []; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|Dg.cs|Dg may not reference component Rb ('ModelSpec') — dependsOn: []; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|Dg.cs|Dg may not reference component Rb ('Rb') — dependsOn: []; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|Dg.cs|Dg may not reference component Rb ('Rb') — dependsOn: []; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|Dg.cs|Dg may not reference component Rb ('Rb') — dependsOn: []; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|Dg.cs|Dg may not reference component Rb ('Rb') — dependsOn: []; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|Dg.cs|Dg may not reference component Rs ('PsrpSession') — dependsOn: []; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|Dg.cs|Dg may not reference component Rs ('PsrpSession') — dependsOn: []; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|Dg.cs|Dg may not reference component Rs ('PsrpSession') — dependsOn: []; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|Dg.cs|Dg may not reference component Rs ('PsrpSession') — dependsOn: []; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|Dg.cs|Dg may not reference component Rs ('Rs') — dependsOn: []; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|Dg.cs|Dg may not reference component Rs ('Rs') — dependsOn: []; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|Dg.cs|Dg may not reference component Vom ('Vom') — dependsOn: []; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|Dg.cs|Dg may not reference component Vom ('Vom') — dependsOn: []; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|Dg.cs|Dg may not reference the unassigned core ('ManagedSession') — dependsOn: []; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|Dg.cs|Dg may not reference the unassigned core ('ManagedSession') — dependsOn: []; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|Dg.cs|Dg may not reference the unassigned core ('ManagedSession') — dependsOn: []; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|Dg.cs|Dg may not reference the unassigned core ('SessionManager') — dependsOn: []; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|Dg.cs|Dg may not reference the unassigned core ('SessionManager') — dependsOn: []; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|Dg.cs|Dg may not reference the unassigned core ('VomInterop') — dependsOn: []; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|Hud.cs|Rb may not reference the unassigned core ('Memory') — dependsOn: [Cm, Dg, Vom]; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|Hud.cs|Rb may not reference the unassigned core ('Network') — dependsOn: [Cm, Dg, Vom]; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|Hud.cs|Rb may not reference the unassigned core ('Power') — dependsOn: [Cm, Dg, Vom]; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|Rs.cs|Rs may not reference the unassigned core ('ObpHost') — dependsOn: [Cm, Dg, Vom]; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS014|ToolCatalog.cs|Rb may not reference the unassigned core ('SubsystemApi') — dependsOn: [Cm, Dg, Vom]; grant the dependency in SystemCatalog.json deliberately or route through a granted seam
+SS015|Cm.cs|Static field '_dbPath' (mutable) — statics compute, never remember/authorize/rendezvous; state belongs in a node (axiom 8, ratchet R2)
+SS015|Cm.cs|Static field '_initialized' (mutable) — statics compute, never remember/authorize/rendezvous; state belongs in a node (axiom 8, ratchet R2)
+SS015|Cm.cs|Static field '_records' (readonly ConcurrentDictionary — the reference is pinned, the state is not) — statics compute, never remember/authorize/rendezvous; state belongs in a node (axiom 8, ratchet R2)
+SS015|Dg.cs|Static field '_ctx' (mutable) — statics compute, never remember/authorize/rendezvous; state belongs in a node (axiom 8, ratchet R2)
+SS015|Dg.cs|Static field '_dir' (mutable) — statics compute, never remember/authorize/rendezvous; state belongs in a node (axiom 8, ratchet R2)
+SS015|Dg.cs|Static field '_ring' (readonly Queue — the reference is pinned, the state is not) — statics compute, never remember/authorize/rendezvous; state belongs in a node (axiom 8, ratchet R2)
+SS015|Dg.cs|Static field '_stateRefreshedAt' (mutable) — statics compute, never remember/authorize/rendezvous; state belongs in a node (axiom 8, ratchet R2)
+SS015|ModelManager.cs|Static field '_active' (readonly Dictionary — the reference is pinned, the state is not) — statics compute, never remember/authorize/rendezvous; state belongs in a node (axiom 8, ratchet R2)
+SS015|ModelManager.cs|Static field '_gates' (readonly Dictionary — the reference is pinned, the state is not) — statics compute, never remember/authorize/rendezvous; state belongs in a node (axiom 8, ratchet R2)
+SS015|PackageInfoDb.cs|Static field '_cache' (mutable) — statics compute, never remember/authorize/rendezvous; state belongs in a node (axiom 8, ratchet R2)
+SS015|PackageInfoDb.cs|Static field '_dbPath' (mutable) — statics compute, never remember/authorize/rendezvous; state belongs in a node (axiom 8, ratchet R2)
+SS015|Pp.cs|Static field '_handlers' (readonly Dictionary — the reference is pinned, the state is not) — statics compute, never remember/authorize/rendezvous; state belongs in a node (axiom 8, ratchet R2)
+SS015|Rs.cs|Static field 'FormatManifests' (readonly array — contents still mutate) — statics compute, never remember/authorize/rendezvous; state belongs in a node (axiom 8, ratchet R2)
+SS015|Rs.cs|Static field 'TypeManifests' (readonly array — contents still mutate) — statics compute, never remember/authorize/rendezvous; state belongs in a node (axiom 8, ratchet R2)
+SS015|Rs.cs|Static field '_appBaseGrounded' (mutable) — statics compute, never remember/authorize/rendezvous; state belongs in a node (axiom 8, ratchet R2)
+SS015|Rs.cs|Static field '_bootstrap' (mutable) — statics compute, never remember/authorize/rendezvous; state belongs in a node (axiom 8, ratchet R2)
+SS015|Rs.cs|Static field '_sessions' (readonly ConcurrentDictionary — the reference is pinned, the state is not) — statics compute, never remember/authorize/rendezvous; state belongs in a node (axiom 8, ratchet R2)
+SS015|Vom.cs|Static field '_owners' (readonly ConcurrentDictionary — the reference is pinned, the state is not) — statics compute, never remember/authorize/rendezvous; state belongs in a node (axiom 8, ratchet R2)
+SS018|PackageInfoDb.cs|.GetAwaiter().GetResult() in core component code — the core is synchronous (real threads + Fence handoff, push/best-effort); async colors callers, hides the owning thread, and enables the sync-over-async deadlock. Make it synchronous, or move it to the host/seam
+SS021|Cm.cs|'System.Environment.GetFolderPath()' reaches into the host OS for a directory — the core must stay host-agnostic; provide the path through the host seam at boot and resolve it from Cm (\System\Config\*), not the ambient environment
+SS021|Cm.cs|'System.IO.Path.GetTempPath()' reaches into the host OS for a directory — the core must stay host-agnostic; provide the path through the host seam at boot and resolve it from Cm (\System\Config\*), not the ambient environment
+SS021|PackageInfoDb.cs|'System.Environment.GetFolderPath()' reaches into the host OS for a directory — the core must stay host-agnostic; provide the path through the host seam at boot and resolve it from Cm (\System\Config\*), not the ambient environment
+SS021|Rs.cs|'System.IO.Path.GetTempPath()' reaches into the host OS for a directory — the core must stay host-agnostic; provide the path through the host seam at boot and resolve it from Cm (\System\Config\*), not the ambient environment
+SS021|Rs.cs|'System.IO.Path.GetTempPath()' reaches into the host OS for a directory — the core must stay host-agnostic; provide the path through the host seam at boot and resolve it from Cm (\System\Config\*), not the ambient environment
+SS022|ProjectionServer.cs|HttpListener serves the UI over a localhost port reachable by any app — a security antipattern; carry the UI on the DirectPort region + fence (→ postMessage → base64), never HTTP

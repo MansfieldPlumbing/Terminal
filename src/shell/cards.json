@@ -1,0 +1,211 @@
+[
+  {
+    "id": "clock",
+    "name": "Clock",
+    "icon": "🕐",
+    "ext": { "native": "clock" },
+    "size": { "w": 240, "h": 150 }
+  },
+  {
+    "id": "ps",
+    "name": "PowerShell",
+    "icon": "▶",
+    "ext": { "native": "ps" },
+    "size": { "w": 360, "h": 280 }
+  },
+  {
+    "id": "battery",
+    "name": "Battery",
+    "icon": "🔋",
+    "presentation": {
+      "type": "AdaptiveCard",
+      "version": "1.5",
+      "body": [
+        { "type": "TextBlock", "text": "Battery", "size": "Small", "isSubtle": true, "weight": "Bolder" },
+        { "type": "TextBlock", "text": "${Level}%", "size": "ExtraLarge", "weight": "Bolder", "spacing": "None" },
+        { "type": "TextBlock", "text": "${Temperature}°C · ${Technology}", "isSubtle": true, "spacing": "None" }
+      ]
+    },
+    "data": { "binding": "script", "command": "Get-AndroidBattery", "refresh": 120 },
+    "actions": { "refresh": { "command": "Get-AndroidBattery" } },
+    "size": { "w": 240, "h": 170 }
+  },
+  {
+    "id": "network",
+    "name": "Network",
+    "icon": "📶",
+    "presentation": {
+      "type": "AdaptiveCard",
+      "version": "1.5",
+      "body": [
+        { "type": "TextBlock", "text": "Network", "size": "Small", "isSubtle": true, "weight": "Bolder" },
+        { "type": "FactSet", "facts": [
+          { "title": "Wi-Fi", "value": "${HasWiFi}" },
+          { "title": "Cellular", "value": "${HasCellular}" },
+          { "title": "Down", "value": "${DownstreamKbps} kbps" }
+        ] }
+      ]
+    },
+    "data": { "binding": "script", "command": "Get-AndroidNetwork", "refresh": 300 },
+    "actions": { "refresh": { "command": "Get-AndroidNetwork" } },
+    "size": { "w": 260, "h": 190 }
+  },
+  {
+    "id": "storage",
+    "name": "Storage",
+    "icon": "💾",
+    "presentation": {
+      "type": "AdaptiveCard",
+      "version": "1.5",
+      "body": [
+        { "type": "TextBlock", "text": "Storage", "size": "Small", "isSubtle": true, "weight": "Bolder" },
+        { "type": "TextBlock", "text": "${FreeGB} GB free", "size": "Large", "weight": "Bolder", "spacing": "None" },
+        { "type": "TextBlock", "text": "of ${TotalGB} GB", "isSubtle": true, "spacing": "None" }
+      ]
+    },
+    "data": { "binding": "script", "command": "Get-AndroidStorage", "refresh": 600 },
+    "actions": { "refresh": { "command": "Get-AndroidStorage" } },
+    "size": { "w": 240, "h": 160 }
+  },
+  {
+    "id": "memory",
+    "name": "Memory",
+    "icon": "🧠",
+    "presentation": {
+      "type": "AdaptiveCard",
+      "version": "1.5",
+      "body": [
+        { "type": "TextBlock", "text": "Memory", "size": "Small", "isSubtle": true, "weight": "Bolder" },
+        { "type": "TextBlock", "text": "${FreeGB} GB free", "size": "Large", "weight": "Bolder", "spacing": "None" },
+        { "type": "TextBlock", "text": "of ${TotalGB} GB${LowNote}", "isSubtle": true, "spacing": "None" }
+      ]
+    },
+    "data": {
+      "binding": "script",
+      "command": "$m = Get-AndroidMemory; @{ FreeGB = [math]::Round($m.AvailableBytes/1GB,1); TotalGB = $m.TotalGB; LowNote = if ($m.LowMemory) { ' · LOW' } else { '' } }",
+      "refresh": 120
+    },
+    "actions": { "refresh": { "command": "$m = Get-AndroidMemory; @{ FreeGB = [math]::Round($m.AvailableBytes/1GB,1); TotalGB = $m.TotalGB; LowNote = if ($m.LowMemory) { ' · LOW' } else { '' } }" } },
+    "size": { "w": 240, "h": 160 }
+  },
+  {
+    "id": "torch",
+    "name": "Flashlight",
+    "icon": "🔦",
+    "presentation": {
+      "type": "AdaptiveCard",
+      "version": "1.5",
+      "body": [
+        { "type": "TextBlock", "text": "Flashlight", "size": "Small", "isSubtle": true, "weight": "Bolder" },
+        { "type": "Input.Rocker", "id": "torch", "onText": "ON", "offText": "OFF", "verb": "set", "spacing": "Small" }
+      ]
+    },
+    "data": { "binding": "static", "value": {} },
+    "actions": {
+      "set": { "command": "Set-Flashlight -State $(if ($CardInputs.torch -eq 'true') { 'On' } else { 'Off' })", "refresh": false }
+    },
+    "size": { "w": 240, "h": 150 }
+  },
+  {
+    "id": "volume",
+    "name": "Volume",
+    "icon": "🔊",
+    "presentation": {
+      "type": "AdaptiveCard",
+      "version": "1.5",
+      "body": [
+        { "type": "TextBlock", "text": "Volume", "size": "Small", "isSubtle": true, "weight": "Bolder" },
+        { "type": "TextBlock", "text": "Media", "size": "Small", "isSubtle": true, "spacing": "Small" },
+        { "type": "Input.Slider", "id": "media", "value": "${Media}", "min": 0, "max": "${MediaMax}", "step": 1, "verb": "media", "spacing": "None" },
+        { "type": "TextBlock", "text": "Ring", "size": "Small", "isSubtle": true, "spacing": "Small" },
+        { "type": "Input.Slider", "id": "ring", "value": "${Ring}", "min": 0, "max": "${RingMax}", "step": 1, "verb": "ring", "spacing": "None" },
+        { "type": "TextBlock", "text": "Alarm", "size": "Small", "isSubtle": true, "spacing": "Small" },
+        { "type": "Input.Slider", "id": "alarm", "value": "${Alarm}", "min": 0, "max": "${AlarmMax}", "step": 1, "verb": "alarm", "spacing": "None" }
+      ]
+    },
+    "data": { "binding": "script", "command": "Get-AndroidVolume", "refresh": 120 },
+    "actions": {
+      "media": { "command": "Set-AndroidVolume -Stream Media -Level ([int]$CardInputs.media)" },
+      "ring": { "command": "Set-AndroidVolume -Stream Ring -Level ([int]$CardInputs.ring)" },
+      "alarm": { "command": "Set-AndroidVolume -Stream Alarm -Level ([int]$CardInputs.alarm)" },
+      "refresh": { "command": "Get-AndroidVolume" }
+    },
+    "size": { "w": 280, "h": 280 }
+  },
+  {
+    "id": "remote",
+    "name": "Touch Remote",
+    "icon": "🎮",
+    "presentation": {
+      "type": "AdaptiveCard",
+      "version": "1.5",
+      "body": [
+        { "type": "TextBlock", "text": "Touch Remote", "size": "Small", "isSubtle": true, "weight": "Bolder" },
+        { "type": "Input.DPad", "id": "pad", "verb": "pad", "repeatMs": 450, "spacing": "Small" },
+        { "type": "TextBlock", "text": "Swipes the screen · ● taps center · hold to repeat", "size": "Small", "isSubtle": true, "wrap": true, "horizontalAlignment": "Center", "spacing": "Small" }
+      ]
+    },
+    "data": { "binding": "static", "value": {} },
+    "actions": {
+      "pad": {
+        "command": "$d = Get-AndroidDisplay; $w = [double]$d.WidthPixels; $h = [double]$d.HeightPixels; $cx = $w / 2; $cy = $h / 2; switch ([string]$CardInputs.pad) { 'up' { Invoke-AndroidSwipe -X1 $cx -Y1 ($h * 0.65) -X2 $cx -Y2 ($h * 0.35) } 'down' { Invoke-AndroidSwipe -X1 $cx -Y1 ($h * 0.35) -X2 $cx -Y2 ($h * 0.65) } 'left' { Invoke-AndroidSwipe -X1 ($w * 0.7) -Y1 $cy -X2 ($w * 0.3) -Y2 $cy } 'right' { Invoke-AndroidSwipe -X1 ($w * 0.3) -Y1 $cy -X2 ($w * 0.7) -Y2 $cy } 'ok' { Invoke-AndroidTap -X $cx -Y $cy } }",
+        "refresh": false
+      }
+    },
+    "size": { "w": 250, "h": 290 }
+  },
+  {
+    "id": "switchboard",
+    "name": "Switchboard",
+    "icon": "🎚",
+    "presentation": {
+      "type": "AdaptiveCard",
+      "version": "1.5",
+      "body": [
+        { "type": "TextBlock", "text": "Remoting", "size": "Small", "isSubtle": true, "weight": "Bolder" },
+        { "type": "ColumnSet", "spacing": "Small", "columns": [
+          { "type": "Column", "width": "stretch", "verticalContentAlignment": "Center", "items": [ { "type": "TextBlock", "text": "CLIXML objects", "wrap": true } ] },
+          { "type": "Column", "width": "auto", "items": [ { "type": "Input.Rocker", "id": "clixml", "value": "${Clixml}", "verb": "clixml" } ] }
+        ] },
+        { "type": "ColumnSet", "spacing": "Small", "columns": [
+          { "type": "Column", "width": "stretch", "verticalContentAlignment": "Center", "items": [ { "type": "TextBlock", "text": "PSRP remoting", "wrap": true } ] },
+          { "type": "Column", "width": "auto", "items": [ { "type": "Input.Rocker", "id": "psrp", "value": "${Psrp}", "verb": "psrp" } ] }
+        ] }
+      ]
+    },
+    "data": {
+      "binding": "script",
+      "command": "@{ Clixml = [bool](Get-Capability '\\Capability\\Remoting\\Clixml').Enabled; Psrp = [bool](Get-Capability '\\Capability\\Remoting\\Psrp').Enabled }",
+      "refresh": 300
+    },
+    "actions": {
+      "clixml": { "command": "Set-Capability -Path '\\Capability\\Remoting\\Clixml' -Enabled ($CardInputs.clixml -eq 'true')" },
+      "psrp": { "command": "Set-Capability -Path '\\Capability\\Remoting\\Psrp' -Enabled ($CardInputs.psrp -eq 'true')" },
+      "refresh": { "command": "@{ Clixml = [bool](Get-Capability '\\Capability\\Remoting\\Clixml').Enabled; Psrp = [bool](Get-Capability '\\Capability\\Remoting\\Psrp').Enabled }" }
+    },
+    "size": { "w": 280, "h": 200 }
+  },
+  {
+    "id": "buzzer",
+    "name": "Buzzer",
+    "icon": "📳",
+    "presentation": {
+      "type": "AdaptiveCard",
+      "version": "1.5",
+      "body": [
+        { "type": "TextBlock", "text": "Buzzer", "size": "Small", "isSubtle": true, "weight": "Bolder" },
+        { "type": "Input.Stepper", "id": "ms", "value": 200, "min": 50, "max": 1000, "step": 50, "suffix": " ms", "spacing": "Small" },
+        { "type": "ActionSet", "spacing": "Small", "actions": [
+          { "type": "Action.Submit", "title": "Vibrate", "data": { "verb": "buzz" } },
+          { "type": "Action.Submit", "title": "Beep", "data": { "verb": "beep" } }
+        ] }
+      ]
+    },
+    "data": { "binding": "static", "value": {} },
+    "actions": {
+      "buzz": { "command": "Invoke-Vibration -Duration ([int]$CardInputs.ms)", "refresh": false },
+      "beep": { "command": "Invoke-Beep", "refresh": false }
+    },
+    "size": { "w": 260, "h": 210 }
+  }
+]

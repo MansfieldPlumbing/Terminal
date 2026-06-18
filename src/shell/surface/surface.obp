@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+  <title>Surface</title>
+  <link rel="stylesheet" href="/theme.css">
+  <script src="/themes.js"></script>
+  <!-- Adaptive Cards renderer (vendored UMD v3.0.2, self-contained — no templating dep; our
+       lib/actemplate.js does the ${} subset). Missing/corrupt → AC cards degrade to error cards. -->
+  <script src="/vendor/adaptivecards/adaptivecards.min.js"></script>
+  <!-- The shell's custom inputs (Input.Rocker/Slider/DPad/Stepper) — registered once, reused by
+       every AC host (REGISTRY-SPEC §5). Must load after the renderer; no-ops if it's missing. -->
+  <script src="/lib/accontrols.js"></script>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; color: var(--fg);
+      font-family: var(--font-sans); user-select: none; -webkit-user-select: none; }
+
+    /* The Surface — a boundless desktop you scroll wherever you want. #world is one big transformed plane;
+       panning is a transform on it (compositor-cheap, zero GPU). Widgets are absolutely positioned in world
+       coords. This is the "DOM core" — works on every device; the WebGPU candy layers UNDER it later. */
+    #surface { position: fixed; inset: 0; overflow: hidden; touch-action: none; }
+    #world { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; }
+
+    /* The surface greets you on open, then fades out of the way on the first pan / add. pointer-events:none
+       so it never blocks the canvas; faint so it reads as ambient, not a modal. */
+    #welcome { position: fixed; inset: 0; z-index: 3; display: flex; align-items: center; justify-content: center;
+      pointer-events: none; transition: opacity .6s ease; }
+    #welcome .hi { font-size: clamp(40px, 12vw, 104px); font-weight: 200; letter-spacing: -2px; color: var(--fg);
+      opacity: .15; text-shadow: 0 2px 40px rgba(0,0,0,.30); }
+    #welcome.gone { opacity: 0; }
+
+    .widget {
+      position: absolute; box-sizing: border-box; border-radius: 16px; overflow: hidden;
+      background: var(--surface); color: var(--fg); border: 1px solid var(--border);
+      box-shadow: 0 12px 34px rgba(0,0,0,0.30); display: flex; flex-direction: column;
+      transition: box-shadow .15s ease; z-index: 10;
+    }
+    .widget.dragging { box-shadow: 0 22px 50px rgba(0,0,0,0.45); z-index: 50; cursor: grabbing; }
+    .widget-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 6px; font-size: 12px;
+      font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; cursor: grab; }
+    .widget-head .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+    .widget-body { flex: 1; padding: 4px 14px 14px; display: flex; flex-direction: column; min-height: 0; }
+
+    /* clock */
+    .w-clock .time { font-size: 40px; font-weight: 300; font-variant-numeric: tabular-nums; letter-spacing: -1px; }
+    .w-clock .date { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+    /* Adaptive Card host — the renderer's output inherits the theme through the generated HostConfig;
+       these keep its container transparent inside our card chrome and its actions themed. */
+    .w-ac .ac-host { flex: 1; min-height: 0; overflow: auto; }
+    .w-ac .ac-host > .ac-container { background: transparent !important; }
+    .w-ac .ac-pushButton { background: var(--accent); color: var(--accent-fg); border: none;
+      border-radius: 8px; padding: 7px 12px; font: 13px var(--font-sans); cursor: pointer; }
+    .w-ac .ac-input { background: rgba(127,127,127,.16); border: 1px solid var(--border); color: var(--fg);
+      border-radius: 8px; padding: 6px 9px; font: 13px var(--font-sans); }
+    .w-ac .err-card { color: var(--error); font: 12px/1.5 var(--font-mono); white-space: pre-wrap; overflow: auto; }
+    .w-ac .err-card .retry { margin-top: 8px; background: var(--accent); color: var(--accent-fg); border: none;
+      border-radius: 8px; padding: 6px 12px; font: 13px var(--font-sans); cursor: pointer; }
+
+    /* powershell command card — the point of the whole thing: a surface to drive PowerShell from */
+    .w-ps .ps-row { display: flex; gap: 6px; align-items: center; }
+    .w-ps .ps-prompt { color: var(--accent); font-family: var(--font-mono); font-size: 13px; cursor: pointer; }
+    .w-ps .ps-prompt:hover { text-decoration: underline; }      /* tap PS> for the full cmdlet list */
+    .w-ps input { flex: 1; min-width: 0; background: rgba(127,127,127,.16); border: 1px solid var(--border);
+      color: var(--fg); border-radius: 8px; padding: 7px 9px; font: 13px var(--font-mono); outline: none; }
+    .w-ps input:focus { border-color: var(--accent); }
+    .w-ps .run { flex: 0 0 auto; width: 32px; height: 32px; border: none; border-radius: 8px; cursor: pointer;
+      background: var(--accent); color: var(--accent-fg); font-size: 14px; }
+    .w-ps .ps-toggle { flex: 0 0 auto; width: 28px; height: 32px; border: none; border-radius: 8px; cursor: pointer;
+      background: transparent; color: var(--muted); font-size: 13px; }
+    .w-ps .ps-toggle:hover { background: rgba(127,127,127,.16); color: var(--fg); }
+    .w-ps .out { flex: 1; margin-top: 8px; overflow: auto; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 10px; font: 12px/1.45 var(--font-mono); white-space: pre-wrap; word-break: break-word;
+      color: var(--fg); min-height: 38px; cursor: copy; }     /* tap output to copy it */
+    .w-ps .out.err { color: var(--error); }
+    .w-ps .out.copied { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .w-ps .out .muted { color: var(--muted); }
+    .w-ps.collapsed .out { display: none; }                   /* collapsed = output hidden, card compact */
+
+    /* long-press context menu (the wallpaper verbs) */
+    #ctx { position: fixed; z-index: 200; min-width: 200px; max-height: 60vh; overflow-y: auto; background: rgba(var(--mica-rgb), calc(var(--mica-strong-opacity) * var(--transparency)));
+      backdrop-filter: blur(var(--mica-blur)); -webkit-backdrop-filter: blur(var(--mica-blur));
+      border: 1px solid var(--border); border-radius: 12px; padding: 6px; box-shadow: 0 16px 48px rgba(0,0,0,.5);
+      display: none; font-family: var(--font-sans); }
+    #ctx button { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: none;
+      border-radius: 8px; background: transparent; color: var(--fg); text-align: left; font: 13px var(--font-sans); cursor: pointer; }
+    #ctx button:hover { background: rgba(127,127,127,.16); }
+    #ctx .sep { height: 1px; background: var(--border); margin: 5px 8px; }
+    #ctx .ico { width: 18px; text-align: center; color: var(--accent); }
+
+    /* cmdlet picker — a live, scrollable list of every cmdlet (from Get-Command). Tap PS> to open it. */
+    #cmdlets { position: fixed; z-index: 220; width: 260px; max-width: 86vw; max-height: 56vh; overflow-y: auto;
+      background: rgba(var(--mica-rgb), calc(var(--mica-strong-opacity) * var(--transparency)));
+      backdrop-filter: blur(var(--mica-blur)); -webkit-backdrop-filter: blur(var(--mica-blur));
+      border: 1px solid var(--border); border-radius: 12px; padding: 6px; box-shadow: 0 16px 48px rgba(0,0,0,.5);
+      display: none; font-family: var(--font-sans); }
+    #cmdlets input.filter { width: 100%; box-sizing: border-box; margin-bottom: 6px; background: rgba(127,127,127,.16);
+      border: 1px solid var(--border); color: var(--fg); border-radius: 7px; padding: 6px 9px; font: 12px var(--font-mono); outline: none; }
+    #cmdlets button { width: 100%; text-align: left; padding: 7px 11px; border: none; border-radius: 7px;
+      background: transparent; color: var(--fg); font: 12px var(--font-mono); cursor: pointer; }
+    #cmdlets button:hover { background: rgba(127,127,127,.16); }
+    #cmdlets .ld { padding: 9px 12px; color: var(--muted); font: 12px var(--font-sans); }
+  </style>
+</head>
+<body>
+  <div id="surface"><div id="world"></div></div>
+  <div id="welcome"><div class="hi">Welcome</div></div>
+  <div id="ctx"></div>
+  <div id="cmdlets"></div>
+
+  <script type="module">
+  import { getConfig, setConfig, getConfigSync } from '/lib/store.js';
+  import { expand } from '/lib/actemplate.js';
+
+  (function () {
+    'use strict';
+    const surface = document.getElementById('surface');
+    const world = document.getElementById('world');
+    const ctx = document.getElementById('ctx');
+    const cmdlets = document.getElementById('cmdlets');
+    const welcomeEl = document.getElementById('welcome');
+    const STORE = 'ss-surface';
+
+    // greeting: show on open, fade on first engagement (pan or add)
+    let _welcomeGone = false;
+    function dismissWelcome() {
+      if (_welcomeGone || !welcomeEl) return;
+      _welcomeGone = true; welcomeEl.classList.add('gone');
+      setTimeout(() => { welcomeEl.style.display = 'none'; }, 650);
+    }
+
+    // ---- camera (free pan over the boundless surface) -----------------------------------------
+    const cam = { x: 0, y: 0 };
+    // Registry-backed surface settings (Settings → Surface). Bounded = clamp to the content edges so you
+    // can't scroll a widget into the void; cols = the arrange-to-grid column count.
+    function S(k, d) { try { const v = getConfigSync(k); return v == null ? d : v; } catch (_) { return d; } }
+    function bounded() { return S('ss-surface-bounded', 'true') === 'true'; }   // out-of-box: bounded; boundless is the opt-in
+    function clampCam() {
+      if (!bounded() || !widgets.length) return;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const w of widgets) { minX = Math.min(minX, w.x); minY = Math.min(minY, w.y); maxX = Math.max(maxX, w.x + w.w); maxY = Math.max(maxY, w.y + w.h); }
+      const M = 40, vw = window.innerWidth, vh = window.innerHeight;
+      const loX = minX - M, hiX = Math.max(loX, maxX + M - vw);
+      const loY = minY - M, hiY = Math.max(loY, maxY + M - vh);
+      cam.x = Math.max(loX, Math.min(hiX, cam.x));
+      cam.y = Math.max(loY, Math.min(hiY, cam.y));
+    }
+    function applyCam() {
+      clampCam();
+      world.style.transform = `translate(${-cam.x}px, ${-cam.y}px)`;
+    }
+    function screenToWorld(sx, sy) { return { x: sx + cam.x, y: sy + cam.y }; }
+
+    // ---- PowerShell bridge: a Surface is a place to run PowerShell. POST a command to the on-device
+    // runspace and render the result. Degrades gracefully off-device (preview) so the widget still mounts.
+    async function runPS(cmd) {
+      try {
+        const r = await fetch('/api/exec', { method: 'POST', headers: { 'Content-Type': 'text/plain', 'X-Subsystem-Cap': (window.AndroidBridge?.getCap?.()||window.__ssCap||'') }, body: cmd });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const j = await r.json();
+        if (j && j.error) throw new Error(j.error);
+        return { ok: true, data: j };
+      } catch (e) { return { ok: false, error: String(e.message || e) }; }
+    }
+    function fmt(data) {
+      if (data == null) return '(no output)';
+      if (typeof data === 'string') return data;
+      try { return JSON.stringify(data, null, 2); } catch (_) { return String(data); }
+    }
+
+    // ---- the cmdlet "manifest": every cmdlet, live from the runspace (Get-Command — NOT a hardcoded list,
+    // so a freshly-made cmdlet shows up by construction). Fetched once, cached, filterable.
+    let _cmdletCache = null;
+    async function loadCmdlets() {
+      if (_cmdletCache) return _cmdletCache;
+      const res = await runPS("Get-Command -CommandType Cmdlet,Function,Alias | Sort-Object Name | Select-Object -ExpandProperty Name");
+      let names = [];
+      if (res.ok) {
+        const d = res.data;
+        if (Array.isArray(d)) names = d.map(String);
+        else if (typeof d === 'string') names = d.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        else if (d && Array.isArray(d.value)) names = d.value.map(String);
+      }
+      _cmdletCache = names;
+      return names;
+    }
+    async function openCmdlets(anchor, input) {
+      cmdlets.innerHTML = '<div class="ld">Loading cmdlets…</div>';
+      cmdlets.style.display = 'block';
+      const r0 = anchor.getBoundingClientRect();
+      cmdlets.style.left = Math.max(8, Math.min(r0.left, window.innerWidth - 268)) + 'px';
+      cmdlets.style.top = Math.min(r0.bottom + 4, window.innerHeight - 60) + 'px';
+      const names = await loadCmdlets();
+      cmdlets.innerHTML = '';
+      const filter = document.createElement('input'); filter.className = 'filter'; filter.placeholder = 'filter ' + names.length + ' cmdlets…'; filter.spellcheck = false;
+      const list = document.createElement('div');
+      cmdlets.append(filter, list);
+      const draw = (q) => {
+        list.innerHTML = '';
+        const ql = q.toLowerCase();
+        const shown = (q ? names.filter(n => n.toLowerCase().includes(ql)) : names).slice(0, 400);
+        if (!shown.length) { const d = document.createElement('div'); d.className = 'ld'; d.textContent = names.length ? 'no match' : 'no cmdlets (on-device only — the runspace lives in the app)'; list.appendChild(d); return; }
+        for (const n of shown) { const b = document.createElement('button'); b.textContent = n;
+          b.onclick = () => { input.value = n + ' '; input.focus(); hideCmdlets(); }; list.appendChild(b); }
+      };
+      draw('');
+      filter.oninput = () => draw(filter.value.trim());
+      filter.addEventListener('pointerdown', e => e.stopPropagation());
+      setTimeout(() => { try { filter.focus(); } catch (_) {} }, 0);
+    }
+    function hideCmdlets() { cmdlets.style.display = 'none'; }
+    window.addEventListener('pointerdown', (e) => { if (cmdlets.style.display === 'block' && !cmdlets.contains(e.target)) hideCmdlets(); }, true);
+
+    // ---- card definitions (the registry's \Capability\Card\* objects via GET /cards) -----------
+    // A def = the REGISTRY-SPEC §3 manifest: {id,name,icon,presentation,data,actions,size,ext}.
+    // ext.native names a DOM renderer (clock/ps); everything else renders as an Adaptive Card.
+    let defs = new Map();
+    async function loadDefs() {
+      try {
+        const r = await fetch('/cards', { cache: 'no-store' });
+        if (r.ok) { const arr = await r.json(); if (Array.isArray(arr)) defs = new Map(arr.map(d => [d.id, d])); }
+      } catch (_) { /* dev/offline — defs stay as-is; native cards still mount */ }
+    }
+
+    // ---- instances (the ss-surface config blob: schema v2 {version, cards:[{id,card,x,y,w,h,…}]}) --
+    let widgets = load();
+    function migrate(v) {
+      // v1 was a bare array of {type,...}; v2 wraps + renames type→card, cmd→props.cmd.
+      const arr = Array.isArray(v) ? v : (v && Array.isArray(v.cards) ? v.cards : null);
+      if (!arr) return null;
+      return arr.map(w => {
+        const m = { id: w.id || id(), card: w.card || w.type, x: w.x | 0, y: w.y | 0, w: w.w || 240, h: w.h || 160 };
+        if (w.collapsed) m.collapsed = true;
+        const props = w.props || (w.cmd ? { cmd: w.cmd } : null);
+        if (props) m.props = props;
+        return m;
+      }).filter(m => m.card);
+    }
+    function load() {
+      try { const m = migrate(JSON.parse(getConfigSync(STORE) || 'null')); if (m) return m; } catch (_) {}
+      // first-run seed: a clock + a live PowerShell card, so the surface is useful on first open
+      return [
+        { id: id(), card: 'clock', x: 40, y: 60,  w: 240, h: 150 },
+        { id: id(), card: 'ps',    x: 40, y: 240, w: 360, h: 280, props: { cmd: 'Get-Date' } },
+      ];
+    }
+    function save() { try { setConfig(STORE, JSON.stringify({ version: 2, cards: widgets })); } catch (_) {} }
+    function id() { return 'w' + Math.random().toString(36).slice(2, 9); }
+
+    function render() {
+      for (const el of world.children) if (el.firstChild && el.lastChild._cleanup) try { el.lastChild._cleanup(); } catch (_) {}
+      world.replaceChildren();
+      for (const w of widgets) world.appendChild(buildWidget(w));
+    }
+
+    function removeWidget(w) {
+      const el = world.querySelector('.widget[data-id="' + w.id + '"]');
+      if (el) { const body = el.querySelector('.widget-body'); if (body && body._cleanup) try { body._cleanup(); } catch (_) {} el.remove(); }
+      widgets = widgets.filter(x => x.id !== w.id);
+      save();
+    }
+
+    function buildWidget(w) {
+      const def = defs.get(w.card) || null;
+      const native = def && def.ext && def.ext.native ? def.ext.native : (w.card === 'clock' || w.card === 'ps' ? w.card : null);
+      const el = document.createElement('div');
+      el.className = 'widget w-' + (native || 'ac');
+      el.dataset.id = w.id;
+      el.style.left = w.x + 'px'; el.style.top = w.y + 'px';
+      el.style.width = w.w + 'px'; el.style.height = (native === 'ps' && w.collapsed) ? 'auto' : (w.h + 'px');
+
+      const head = document.createElement('div');
+      head.className = 'widget-head';
+      head.innerHTML = '<span class="dot"></span><span class="ttl"></span>';
+      head.querySelector('.ttl').textContent = (def && def.name) || (native === 'ps' ? 'PowerShell' : native === 'clock' ? 'Clock' : w.card);
+      el.appendChild(head);
+
+      const body = document.createElement('div');
+      body.className = 'widget-body';
+      el.appendChild(body);
+
+      if (native === 'clock') mountClock(body);
+      else if (native === 'ps') mountPS(body, w);
+      else mountAC(body, w, def);
+
+      // drag the widget by its head (moves it in world space); body interactions stay live.
+      // Long-press (head OR body) opens the card's verb sheet: Refresh / Remove.
+      makeDraggable(el, head, w);
+      bindCardPress(el, head, w);
+      return el;
+    }
+
+    // ---- the Adaptive Card mount: data script → ${} expand → render. EVERY failure degrades to an
+    // error card in THIS frame only (the render loop never dies on one card — the safety contract
+    // that lets the agent mint cards at runtime).
+    function mountAC(body, w, def) {
+      let timer = null;
+      body._cleanup = () => { if (timer) { clearInterval(timer); timer = null; } };
+
+      const errCard = (msg) => {
+        body.innerHTML = '';
+        const d = document.createElement('div'); d.className = 'err-card';
+        d.textContent = (def && def.name ? def.name + ': ' : '') + msg;
+        const retry = document.createElement('button'); retry.className = 'retry'; retry.textContent = 'Retry';
+        retry.addEventListener('pointerdown', e => e.stopPropagation());
+        retry.onclick = () => refresh();
+        d.appendChild(document.createElement('br'));
+        d.appendChild(retry);
+        body.appendChild(d);
+      };
+
+      if (!def) { errCard('no such card in the registry (' + w.card + ') — long-press to remove'); return; }
+      if (typeof AdaptiveCards === 'undefined') { errCard('renderer unavailable (vendor bundle missing)'); return; }
+      if (!def.presentation) { errCard('card has no presentation template'); return; }
+
+      async function refresh() {
+        let data = {};
+        const binding = def.data && def.data.binding;
+        if (binding === 'script' && def.data.command) {
+          const res = await runPS(def.data.command);
+          if (!res.ok) { errCard(res.error + '\n(on-device only — the runspace lives in the app)'); return; }
+          data = res.data || {};
+        } else if (binding === 'static') data = def.data.value || {};
+        try {
+          const payload = expand(def.presentation, data);
+          const card = new AdaptiveCards.AdaptiveCard();
+          card.hostConfig = themeHostConfig();
+          card.onExecuteAction = (action) => runCardAction(action, def, refresh);
+          card.parse(payload);
+          const rendered = card.render();
+          body.innerHTML = '';
+          const host = document.createElement('div'); host.className = 'ac-host';
+          host.appendChild(rendered);
+          // The surface's pointer capture (pan/long-press) retargets pointerup, so `click` never
+          // composes on a captured child — keep pointerdowns that start on an interactive AC
+          // element (push buttons, inputs) out of the pan, exactly like the PS card's controls.
+          host.addEventListener('pointerdown', (e) => {
+            if (e.target.closest('button, input, select, textarea, a')) e.stopPropagation();
+          });
+          body.appendChild(host);
+        } catch (e) { errCard('template/render failed: ' + (e.message || e)); }
+      }
+
+      refresh();
+      // refresh policy: clamped ≥15s; absent/0 = manual only; paused while the document is hidden.
+      const sec = def.data && def.data.refresh ? Math.max(15, def.data.refresh | 0) : 0;
+      if (sec) timer = setInterval(() => { if (!document.hidden) refresh(); }, sec * 1000);
+      body._refresh = refresh;
+    }
+
+    // Action.Submit → the manifest's actions[verb].command, with the submitted inputs crossing as
+    // BASE64 → $CardInputs (data, never spliced into the command text). Then re-bind the card —
+    // unless the manifest marks the verb `refresh:false` (a STATELESS verb: d-pad press, buzz,
+    // torch flip — re-rendering would wipe the control's local state / interrupt a held button).
+    async function runCardAction(action, def, refresh) {
+      try {
+        const data = action && action.data ? action.data : {};
+        const verb = data.verb || 'refresh';
+        const act = def.actions && def.actions[verb];
+        if (!act || !act.command) { refresh(); return; }
+        const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+        const script = "$CardInputs = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + b64 + "')) | ConvertFrom-Json; " + act.command;
+        await runPS(script);
+        if (act.refresh !== false) refresh();
+      } catch (e) { console.warn('card action failed', e); }
+    }
+
+    // ---- HostConfig generated from the theme vars (REGISTRY-SPEC §4: "Adaptive Cards get a
+    // HostConfig generated from the vars"). Rebuilt on theme change (storage event) + re-rendered.
+    let _hostCfg = null;
+    function themeHostConfig() {
+      if (_hostCfg) return _hostCfg;
+      const css = getComputedStyle(document.documentElement);
+      const v = (n, d) => (css.getPropertyValue(n) || d).trim();
+      const fg = v('--fg', '#ffffff'), muted = v('--muted', '#878787'), accent = v('--accent', '#4cc2ff');
+      const colors = { default: { default: fg, subtle: muted }, accent: { default: accent, subtle: accent },
+        good: { default: v('--success', '#10b981'), subtle: v('--success', '#10b981') },
+        attention: { default: v('--error', '#ef4444'), subtle: v('--error', '#ef4444') },
+        warning: { default: v('--accent-2', '#e3008c'), subtle: v('--accent-2', '#e3008c') },
+        dark: { default: fg, subtle: muted }, light: { default: fg, subtle: muted } };
+      _hostCfg = new AdaptiveCards.HostConfig({
+        fontFamily: v('--font-sans', 'sans-serif'),
+        containerStyles: {
+          default: { backgroundColor: 'transparent', foregroundColors: colors },
+          emphasis: { backgroundColor: 'transparent', foregroundColors: colors },
+        },
+      });
+      return _hostCfg;
+    }
+    window.addEventListener('storage', () => { _hostCfg = null; render(); });
+
+    function mountClock(body) {
+      body.innerHTML = '<div class="w-clock"><div class="time">--:--</div><div class="date"></div></div>';
+      const t = body.querySelector('.time'), d = body.querySelector('.date');
+      const tick = () => {
+        const now = new Date();
+        t.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        d.textContent = now.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+      };
+      tick(); const iv = setInterval(tick, 1000);
+      body._cleanup = () => clearInterval(iv);
+    }
+
+    function mountPS(body, w) {
+      body.innerHTML =
+        '<div class="w-ps' + (w.collapsed ? ' collapsed' : '') + '" style="flex:1;display:flex;flex-direction:column;min-height:0;">' +
+          '<div class="ps-row">' +
+            '<span class="ps-prompt" title="Cmdlets">PS&gt;</span>' +
+            '<input type="text" spellcheck="false" autocapitalize="off" autocomplete="off">' +
+            '<button class="run" title="Run">▶</button>' +
+            '<button class="ps-toggle" title="Show / hide output"></button>' +
+          '</div>' +
+          '<div class="out"><span class="muted">Run a cmdlet — its result renders here. Tap output to copy.</span></div>' +
+        '</div>';
+      const card = body.querySelector('.w-ps');
+      const el = body.closest('.widget');
+      const input = body.querySelector('input'), btn = body.querySelector('.run'), out = body.querySelector('.out');
+      const toggle = body.querySelector('.ps-toggle'), prompt = body.querySelector('.ps-prompt');
+      input.value = (w.props && w.props.cmd) || '';
+
+      const syncCollapsed = () => {
+        const c = card.classList.contains('collapsed');
+        toggle.textContent = c ? '▸' : '▾';
+        if (el) el.style.height = c ? 'auto' : (w.h + 'px');
+      };
+      syncCollapsed();
+
+      const run = async () => {
+        const cmd = input.value.trim(); if (!cmd) return;
+        (w.props = w.props || {}).cmd = cmd;
+        card.classList.remove('collapsed'); w.collapsed = false; syncCollapsed(); save();   // running reveals output
+        out.classList.remove('err'); out.textContent = 'running…';
+        const res = await runPS(cmd);
+        if (res.ok) { out.classList.remove('err'); out.textContent = fmt(res.data); }
+        else { out.classList.add('err'); out.textContent = res.error + '\n(on-device only — the runspace lives in the app)'; }
+      };
+      btn.onclick = run;
+      input.onkeydown = (e) => { if (e.key === 'Enter') run(); };
+
+      // collapse / expand the output
+      toggle.onclick = () => { card.classList.toggle('collapsed'); w.collapsed = card.classList.contains('collapsed'); syncCollapsed(); save(); };
+
+      // tap the output to copy it to the clipboard (127.0.0.1 is a secure context, so the Clipboard API works;
+      // execCommand is the fallback). Brief outline flash confirms.
+      out.onclick = async () => {
+        const txt = out.textContent || ''; if (!txt) return;
+        let ok = false;
+        try { await navigator.clipboard.writeText(txt); ok = true; }
+        catch (_) { try { const ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); ok = document.execCommand('copy'); ta.remove(); } catch (__) {} }
+        if (ok) { out.classList.add('copied'); setTimeout(() => out.classList.remove('copied'), 650); }
+      };
+
+      // tap PS> for the scrollable list of every cmdlet
+      prompt.onclick = (e) => { e.stopPropagation(); openCmdlets(prompt, input); };
+
+      // don't let typing / scrolling / tapping inside the card start a surface pan
+      [input, out, toggle, prompt].forEach(n => n.addEventListener('pointerdown', e => e.stopPropagation()));
+    }
+
+    // ---- dragging a widget vs panning the surface ---------------------------------------------
+    function makeDraggable(el, handle, w) {
+      handle.addEventListener('pointerdown', (e) => {
+        e.stopPropagation(); handle.setPointerCapture(e.pointerId);
+        el.classList.add('dragging');
+        const start = { px: e.clientX, py: e.clientY, x: w.x, y: w.y };
+        const move = (ev) => { w.x = start.x + (ev.clientX - start.px); w.y = start.y + (ev.clientY - start.py);
+          el.style.left = w.x + 'px'; el.style.top = w.y + 'px'; };
+        const up = (ev) => { el.classList.remove('dragging'); save();
+          handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', up); };
+        handle.addEventListener('pointermove', move); handle.addEventListener('pointerup', up);
+      });
+    }
+
+    // ---- long-press a CARD → its verb sheet (Refresh / Remove) — the kill switch that was missing.
+    // Mirrors the wallpaper's lp pattern: armed on pointerdown anywhere on the widget, cancelled by
+    // >6px of movement (drag/pan wins). Reuses the #ctx sheet.
+    function bindCardPress(el, head, w) {
+      let t = null, sx = 0, sy = 0;
+      const arm = (e) => {
+        sx = e.clientX; sy = e.clientY;
+        if (t) clearTimeout(t);
+        t = setTimeout(() => { t = null; openCardCtx(sx, sy, w); }, 480);
+      };
+      const cancelIfMoved = (e) => { if (t && Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) > 6) { clearTimeout(t); t = null; } };
+      const cancel = () => { if (t) { clearTimeout(t); t = null; } };
+      el.addEventListener('pointerdown', arm);
+      el.addEventListener('pointermove', cancelIfMoved);
+      el.addEventListener('pointerup', cancel);
+      el.addEventListener('pointercancel', cancel);
+    }
+
+    function openCardCtx(sx, sy, w) {
+      const def = defs.get(w.card);
+      ctx.innerHTML = '';
+      const item = (ico, label, fn) => { const b = document.createElement('button');
+        b.innerHTML = `<span class="ico">${ico}</span><span></span>`;
+        b.lastElementChild.textContent = label;
+        b.onclick = () => { hideCtx(); fn(); }; ctx.appendChild(b); };
+      item('↻', 'Refresh', () => {
+        const el = world.querySelector('.widget[data-id="' + w.id + '"]');
+        const body = el && el.querySelector('.widget-body');
+        if (body && body._refresh) body._refresh();
+        else { removeWidget(w); widgets.push(w); save(); world.appendChild(buildWidget(w)); }
+      });
+      const sep = document.createElement('div'); sep.className = 'sep'; ctx.appendChild(sep);
+      item('✕', 'Remove' + (def && def.name ? ' ' + def.name : ''), () => removeWidget(w));
+      ctx.style.display = 'block';
+      const r = ctx.getBoundingClientRect();
+      ctx.style.left = Math.min(sx, window.innerWidth - r.width - 8) + 'px';
+      ctx.style.top = Math.min(sy, window.innerHeight - r.height - 8) + 'px';
+    }
+
+    // ---- pan + long-press on the wallpaper ----------------------------------------------------
+    let drag = null, lp = null;
+    surface.addEventListener('pointerdown', (e) => {
+      surface.setPointerCapture(e.pointerId);
+      drag = { px: e.clientX, py: e.clientY, cx: cam.x, cy: cam.y, moved: false };
+      hideCtx();
+      lp = setTimeout(() => { lp = null; if (!drag.moved) openCtx(e.clientX, e.clientY); }, 480);
+    });
+    surface.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      const dx = e.clientX - drag.px, dy = e.clientY - drag.py;
+      if (Math.abs(dx) + Math.abs(dy) > 6) { drag.moved = true; dismissWelcome(); if (lp) { clearTimeout(lp); lp = null; } }
+      cam.x = drag.cx - dx; cam.y = drag.cy - dy; applyCam();
+    });
+    const endPan = (e) => { if (lp) { clearTimeout(lp); lp = null; } drag = null; try { surface.releasePointerCapture(e.pointerId); } catch (_) {} };
+    surface.addEventListener('pointerup', endPan);
+    surface.addEventListener('pointercancel', endPan);
+
+    // ---- the wallpaper context menu: Add card (live from the registry) / Broker / Arrange -------
+    function openCtx(sx, sy) {
+      const wpt = screenToWorld(sx, sy);
+      ctx.innerHTML = '';
+      const item = (ico, label, fn) => { const b = document.createElement('button');
+        b.innerHTML = `<span class="ico">${ico}</span><span></span>`;
+        b.lastElementChild.textContent = label;
+        b.onclick = () => { hideCtx(); fn(); }; ctx.appendChild(b); };
+      // Add card · <every def in the registry> — a live projection, never a hardcoded pair.
+      for (const def of defs.values())
+        item(def.icon || '·', 'Add card · ' + (def.name || def.id), () => addWidget(def.id, wpt));
+      const sep = document.createElement('div'); sep.className = 'sep'; ctx.appendChild(sep);
+      // The FOB's workshop entrance: hand the ask to Broker (the shell opens the agent with a
+      // prefilled prompt — she mints the card via make_card and it appears on resync).
+      item('💬', 'New card with Broker…', () => {
+        try { window.parent.postMessage({ type: 'shell-open', id: 'agent',
+          params: { prompt: 'Make me a card that ' } }, '*'); } catch (_) {}
+      });
+      item('▦', 'Arrange to grid', arrangeToGrid);
+      item('🖼', 'System wallpaper…', () => openWallpaperCtx(sx, sy));
+      item('↻', 'Refresh', resync);
+      ctx.style.display = 'block';
+      const r = ctx.getBoundingClientRect();
+      ctx.style.left = Math.min(sx, window.innerWidth - r.width - 8) + 'px';
+      ctx.style.top = Math.min(sy, window.innerHeight - r.height - 8) + 'px';
+    }
+    function hideCtx() { ctx.style.display = 'none'; }
+    window.addEventListener('pointerdown', (e) => { if (!ctx.contains(e.target) && e.target !== surface && drag === null) hideCtx(); }, true);
+
+    // ---- the SYSTEM wallpaper picker: a viewport onto \Capability\Shader\* through the registry
+    // (Get/Set-SystemWallpaper over /api/exec). The launcher renders the shader natively (Gr's Wp
+    // port); the in-app live wallpaper is retired. Backend offline → a quiet note, never a throw.
+    async function openWallpaperCtx(sx, sy) {
+      ctx.innerHTML = '';
+      const item = (ico, label, fn) => { const b = document.createElement('button');
+        b.innerHTML = `<span class="ico">${ico}</span><span></span>`;
+        b.lastElementChild.textContent = label;
+        b.onclick = () => { hideCtx(); if (fn) fn(); }; ctx.appendChild(b); };
+      const place = () => {
+        ctx.style.display = 'block';
+        const r = ctx.getBoundingClientRect();
+        ctx.style.left = Math.min(sx, window.innerWidth - r.width - 8) + 'px';
+        ctx.style.top = Math.min(sy, window.innerHeight - r.height - 8) + 'px';
+      };
+      item('…', 'Reading shader catalog…', null);
+      place();
+      const res = await runPS('Get-SystemWallpaper');
+      if (!ctx.innerHTML || ctx.style.display !== 'block') return;   // user dismissed while loading
+      ctx.innerHTML = '';
+      const cur = res.ok && res.data ? res.data : null;
+      if (!cur || !cur.Available) {
+        item('·', 'Catalog unavailable (on-device only)', null);
+      } else {
+        const ids = cur.Available, names = cur.AvailableNames || ids;
+        ids.forEach((id, i) => item(id === cur.Playlist ? '✓' : '·', names[i] || id,
+          () => runPS("Set-SystemWallpaper '" + id.replace(/[^a-z0-9-]/gi, '') + "'")));
+        const sep = document.createElement('div'); sep.className = 'sep'; ctx.appendChild(sep);
+        item('🖼', 'Set as device wallpaper…', () => runPS('Start-SystemWallpaperPicker'));
+      }
+      place();
+    }
+
+    function addWidget(cardId, wpt) {
+      dismissWelcome();
+      const def = defs.get(cardId);
+      const size = (def && def.size) || { w: 240, h: 180 };
+      const w = { id: id(), card: cardId, x: Math.round(wpt.x - size.w / 2), y: Math.round(wpt.y - 24), w: size.w, h: size.h };
+      // new PowerShell cards arrive COLLAPSED (compact) — tap ▾ or run to reveal output
+      if (def && def.ext && def.ext.native === 'ps') { w.collapsed = true; w.props = { cmd: 'Get-Date' }; }
+      widgets.push(w); save(); world.appendChild(buildWidget(w));
+    }
+
+    // ---- arrange to grid: gather every widget (wherever it wandered) into a tidy grid at origin,
+    // then fly the camera home. The "get unlost" verb — the matched pair to drag-anywhere/add-anywhere.
+    function arrangeToGrid() {
+      const PAD = 20, COLS = Math.max(1, parseInt(S('ss-surface-cols', '4')) || 4);
+      let col = 0, row = 0, rowH = 0, x = PAD, y = PAD;
+      for (const w of widgets) {
+        if (col >= COLS) { col = 0; x = PAD; y += rowH + PAD; rowH = 0; }
+        w.x = x; w.y = y; x += w.w + PAD; rowH = Math.max(rowH, w.h); col++;
+      }
+      save(); render();
+      // lerp camera home so the freshly-arranged grid is in view
+      const sx = cam.x, sy = cam.y, t0 = performance.now();
+      (function ease(t) { const k = Math.min(1, (t - t0) / 350); const e = 1 - Math.pow(1 - k, 3);
+        cam.x = sx * (1 - e); cam.y = sy * (1 - e); applyCam(); if (k < 1) requestAnimationFrame(ease); })(t0);
+    }
+
+    // boot: camera up immediately; resync() hydrates defs + the instance blob, then renders.
+    applyCam();
+    window.SS_Surface = { addWidget, arrangeToGrid, widgets: () => widgets, cam };
+
+    // Resync: re-read defs + the instance blob from the backend (Broker mints cards / another
+    // presenter edited the layout while we weren't looking). On boot, on every return to visibility,
+    // and on the ctx verb.
+    async function resync() {
+      await loadDefs();
+      try {
+        const val = await getConfig(STORE);
+        if (val) {
+          const m = migrate(JSON.parse(val));
+          if (m && JSON.stringify(m) !== JSON.stringify(widgets)) widgets = m;
+        }
+      } catch (_) {}
+      render();
+    }
+    resync();
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) resync(); });
+    window.addEventListener('focus', () => resync());
+
+    const syncKeys = ['ss-surface-bounded', 'ss-surface-cols'];
+    syncKeys.forEach(k => {
+      getConfig(k).then(val => {
+        if (val !== null && val !== undefined) {
+          if (k === 'ss-surface-bounded') applyCam();
+        }
+      });
+    });
+  })();
+  </script>
+</body>
+</html>

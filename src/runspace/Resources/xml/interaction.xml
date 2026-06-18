@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Declares Subsystem as a full VoiceInteractionService so it can claim the
+     android.app.role.ASSISTANT role. Holding that role grants:
+       - onHandleAssist  -> AssistStructure (prompt-free screen read)
+       - onHandleScreenshot -> Bitmap (vision input for the local model)
+       - AppFunctions agent/caller capability (invoke provider apps)
+     sessionService + recognitionService are both REQUIRED for the service to be
+     considered valid by VoiceInteractionServiceInfo. -->
+<voice-interaction-service
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:sessionService="dev.mansfieldplumbing.subsystem.SubsystemVoiceInteractionSessionService"
+    android:recognitionService="dev.mansfieldplumbing.subsystem.SubsystemRecognitionService"
+    android:supportsAssist="true"
+    android:supportsLaunchVoiceAssistFromKeyguard="false" />

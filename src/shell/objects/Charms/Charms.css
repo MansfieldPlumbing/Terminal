@@ -1,0 +1,46 @@
+/* Charms — the left-edge CHARM BAR, to the prototype's proportions (CHARM.xaml: 85px bar, 100px
+   charm buttons, 32px glyph over a small label, the cluster vertically CENTERED, accent hover).
+   Theme vars only; glass per the mica contract. STATIC — five charms, no scrolling. */
+
+.object-charms .charms-veil {
+  position: fixed; inset: 0; z-index: 935;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.object-charms .charms-panel {
+  position: fixed; left: 0; top: 0; bottom: 0; width: 56px;
+  z-index: 945;
+  transform: translateX(-100%);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  background: rgba(var(--mica-rgb), calc(var(--mica-strong-opacity) * var(--transparency)));
+  backdrop-filter: blur(var(--mica-blur));
+  border-right: 1px solid var(--border);
+  display: flex; align-items: center;     /* the stack centers as ONE cluster (prototype StackPanel) */
+  color: var(--fg); font-family: var(--font-sans);
+}
+
+.object-charms .charms-stack {
+  width: 100%;
+  display: flex; flex-direction: column; align-items: stretch;
+}
+
+/* SKINNY + icon-only (user directive): 56px bar, 26px glyphs, no labels (the title attr carries the
+   name for long-press/a11y). Start stays the biggest thing in the middle. */
+.object-charms .charm {
+  width: 56px; height: 60px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: transparent; border: none; color: var(--fg);
+  cursor: pointer; font-family: var(--font-sans);
+  transition: background 0.15s;
+}
+/* Prototype hover = accent at 60% — the charm "lights up". */
+.object-charms .charm:hover,
+.object-charms .charm:active { background: color-mix(in srgb, var(--accent) 60%, transparent); }
+
+.object-charms .charm-icon {
+  height: 30px; display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono);   /* CaskaydiaCove NF — glyphs come from the font, no icon lib */
+  font-size: 26px; line-height: 1;
+}
+
+.object-charms .charm-label { display: none; }

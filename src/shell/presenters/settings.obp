@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <base href="/">
+  <title>Settings</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/theme.css">
+  <script src="/themes.js"></script>
+  <script src="/schemes.js"></script>
+  <script src="/schemes-editor.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body, html { margin:0; padding:0; width:100vw; height:100vh; overflow:hidden;
+      background: var(--bg); font-family: var(--font-sans, -apple-system, "Segoe UI", Roboto, sans-serif);
+      color: var(--fg); user-select:none; font-size: 16px; }
+    button { background:none; border:none; color:inherit; font:inherit; cursor:pointer; padding:0; outline:none; }
+    #app { display:flex; flex-direction:column; width:100%; height:100%; }
+    #breadcrumbs-wrapper { width:100%; max-width:56rem; margin:0 auto; padding:24px 16px 16px; display:flex; align-items:center; }
+    .breadcrumbs-mask { display:flex; align-items:center; white-space:nowrap; overflow-x:auto; width:100%; font-weight:600;
+      -webkit-mask-image: linear-gradient(to right, transparent 0, black 16px, black calc(100% - 16px), transparent 100%); }
+    .breadcrumbs-mask::-webkit-scrollbar { display:none; }
+    .crumb-btn { padding:4px 8px; border-radius:6px; display:flex; align-items:center; transition:all .15s; }
+    .crumb-btn:not(.active){ color: var(--muted,#9ca3af); } .crumb-btn:not(.active):hover{ color:var(--fg); background:rgba(127,127,127,.12); }
+    .crumb-btn.active{ color:var(--fg); cursor:default; } .crumb-sep{ color:var(--accent-2,#D80073); padding:0 6px; font-weight:600; opacity:.85; }
+    #view-container { position:relative; flex:1; width:100%; overflow:hidden; }
+    .view-pane { position:absolute; inset:0; overflow-x:hidden; overflow-y:auto; padding-bottom:128px; transition:all .25s cubic-bezier(.25,1,.5,1); }
+    .view-pane > div { max-width:56rem; margin:0 auto; padding:0 16px; display:flex; flex-direction:column; gap:14px; }
+    .surface { background: var(--surface, rgba(32,32,32,.5)); border:1px solid var(--border, rgba(255,255,255,.1)); border-radius:.5rem; display:flex; flex-direction:column; overflow:hidden; }
+    .surface-header { padding:16px 20px; border-bottom:1px solid var(--border, rgba(255,255,255,.1)); }
+    .surface-header h3 { margin:0; font-size:14px; font-weight:600; color:var(--fg); }
+    .surface-item:not(:last-child){ border-bottom:1px solid rgba(255,255,255,.05); }
+    .action-row { width:100%; display:flex; align-items:center; justify-content:space-between; padding:16px;
+      background: var(--surface, rgba(32,32,32,.5)); border:1px solid var(--border, rgba(255,255,255,.1)); border-radius:.5rem; transition:all .15s; }
+    .action-row:hover{ background:rgba(255,255,255,.1); } .action-row:active{ transform:scale(.99); }
+    .action-row .left{ display:flex; align-items:center; gap:16px; } .action-row .icon{ color: var(--muted,#9ca3af); display:flex; }
+    .action-row .label{ font-weight:600; font-size:15px; color:var(--fg); text-align:left; } .action-row .caption{ font-size:13px; color: var(--muted,#9ca3af); margin-top:2px; text-align:left; }
+    .ctrl-row { padding:20px; display:flex; flex-direction:column; gap:8px; }
+    .ctrl-header { display:flex; align-items:center; justify-content:space-between; font-size:14px; font-weight:500; color:var(--fg); }
+    .ctrl-val { font-family:monospace; color: var(--muted,#9ca3af); width:48px; text-align:right; }
+    .ctrl-caption { font-size:13px; color:var(--muted); margin-top:4px; }
+    .slider-wrap { position:relative; width:100%; display:flex; align-items:center; padding-top:8px; height:24px; }
+    .slider-wrap input[type=range]{ position:absolute; width:100%; height:100%; opacity:0; cursor:pointer; z-index:10; margin:0; }
+    .sl-track{ width:100%; height:4px; background:rgba(135,135,135,.4); border-radius:99px; overflow:hidden; pointer-events:none; }
+    .sl-fill{ height:100%; background: var(--accent); }
+    .sl-thumb{ position:absolute; height:18px; width:18px; border-radius:99px; background: var(--border); border:4px solid var(--accent); transition:transform .1s; pointer-events:none; }
+    .toggle-row { padding:18px 20px; display:flex; align-items:center; justify-content:space-between; }
+    .toggle-row input[type=checkbox]{ width:20px; height:20px; accent-color: var(--accent); cursor:pointer; }
+    .radio-group{ display:flex; gap:16px; margin-top:8px; flex-wrap:wrap; } .radio-label{ display:flex; align-items:center; gap:8px; font-size:14px; color:var(--fg); cursor:pointer; } .radio-label input{ accent-color: var(--accent); }
+    .btn-action{ display:inline-flex; align-items:center; gap:8px; padding:8px 16px; background:rgba(127,127,127,.16); color:var(--fg); font-weight:500; border-radius:6px; border:1px solid var(--border, rgba(255,255,255,.15)); transition:all .15s; }
+    .btn-action.primary{ background: var(--accent); border-color:transparent; }
+    .swatch-btn{ width:30px; height:30px; border-radius:6px; border:2px solid var(--border,rgba(255,255,255,.15)); cursor:pointer; transition:transform .12s; }
+    .swatch-btn.active{ border-color:var(--fg); transform:scale(1.12); }
+    .badge{ font-size:11px; padding:2px 6px; border-radius:4px; }
+    /* rocker toggle (replaces checkboxes) */
+    .rocker{ width:46px; height:26px; border-radius:999px; background:rgba(127,127,127,.30); border:1px solid var(--border,rgba(255,255,255,.15)); position:relative; flex-shrink:0; cursor:pointer; transition:background .15s, border-color .15s; padding:0; }
+    .rocker.on{ background:var(--accent); border-color:transparent; }
+    .rocker .knob{ position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%; background: var(--fg); transition:left .15s; box-shadow:0 1px 3px rgba(0,0,0,.4); }
+    .rocker.on .knob{ left:22px; }
+  </style>
+  <script src="/shell/presenter.js"></script>
+</head>
+<body>
+  <div id="app">
+    <div id="breadcrumbs-wrapper"><div class="breadcrumbs-mask" id="breadcrumbs"></div></div>
+    <div id="view-container"></div>
+  </div>
+
+  <script type="module">
+    import { WebSocketClient } from '/lib/api.js';
+    import { getConfig, setConfig, getConfigSync } from '/lib/store.js';
+
+    const bridge = window.AndroidBridge || null;
+    const T0 = (window.Themes ? window.Themes.get() : { mode:'dark', accent:'#0084ff', transparency:1 });
+
+    const iniString = `
+[Settings.Root]
+type=View
+title=Settings
+
+[Settings.Root.Nav.Personalization]
+type=ActionRow
+label=Personalization
+caption=Theme, accent, transparency, dock style
+icon=Palette
+target=Settings.Personalization
+parent=Settings.Root
+
+[Settings.Root.Nav.Surface]
+type=ActionRow
+label=Surface
+caption=The PowerShell desktop — widgets, canvas, layout
+icon=Layout
+target=Settings.Surface
+parent=Settings.Root
+
+[Settings.Root.Nav.Terminal]
+type=ActionRow
+label=Terminal
+caption=Color schemes, palettes and cursor
+icon=Terminal
+target=Settings.Terminal
+parent=Settings.Root
+
+[Settings.Root.Nav.Network]
+type=ActionRow
+label=Network & Sharing
+caption=Server, remoting and broadcast surfaces
+icon=Wifi
+target=Settings.Network
+parent=Settings.Root
+
+[Settings.Root.Nav.Permissions]
+type=ActionRow
+label=Permissions & Capabilities
+caption=Android runtime grants
+icon=Lock
+target=Settings.Permissions
+parent=Settings.Root
+
+[Settings.Root.Nav.About]
+type=ActionRow
+label=About
+caption=Version, runtime, source
+icon=Info
+target=Settings.About
+parent=Settings.Root
+
+[Settings.Personalization]
+type=View
+title=Personalization
+
+[Settings.Personalization.Appearance]
+type=Surface
+title=Appearance
+parent=Settings.Personalization
+
+[Settings.Personalization.Appearance.Theme]
+type=Custom
+component=ThemePicker
+parent=Settings.Personalization.Appearance
+
+[Settings.Personalization.Appearance.Colors]
+type=Custom
+component=ColorKnobs
+parent=Settings.Personalization.Appearance
+
+[Settings.Personalization.Appearance.Mica]
+type=Toggle
+label=Enable Mica Transparency
+caption=Frosted-glass blur on panels and chrome (off = solid surfaces)
+value=true
+storeKey=mica
+parent=Settings.Personalization.Appearance
+
+[Settings.Personalization.Appearance.Transparency]
+type=Slider
+label=Transparency
+caption=Surface translucency across the shell
+min=0
+max=1
+value=1
+multiplier=100
+unit=%
+storeKey=transparency
+parent=Settings.Personalization.Appearance
+
+[Settings.Personalization.Dock]
+type=Surface
+title=Shell
+parent=Settings.Personalization
+
+[Settings.Personalization.Dock.BarStyle]
+type=RadioGroup
+label=Dock Style
+caption=Task bar on the bottom, or tab bar on top
+value=taskbar
+options=taskbar:Task Bar (bottom), tabbar:Tab Bar (top)
+storeKey=barStyle
+parent=Settings.Personalization.Dock
+
+[Settings.Surface]
+type=View
+title=Surface
+
+[Settings.Surface.Canvas]
+type=Surface
+title=Canvas
+parent=Settings.Surface
+
+[Settings.Surface.Canvas.Bounded]
+type=Toggle
+label=Bounded canvas
+caption=Stop at the edges instead of scrolling forever — you can't lose a widget in the void
+value=false
+storeKey=surfaceBounded
+parent=Settings.Surface.Canvas
+
+[Settings.Surface.Canvas.Cols]
+type=Slider
+label=Arrange grid columns
+caption=Columns used by long-press → Arrange to grid
+min=1
+max=8
+value=4
+multiplier=1
+unit= cols
+storeKey=surfaceCols
+parent=Settings.Surface.Canvas
+
+[Settings.Surface.Manage]
+type=Custom
+component=SurfaceActions
+parent=Settings.Surface
+
+[Settings.Terminal]
+type=View
+title=Terminal
+
+[Settings.Terminal.Nav.Schemes]
+type=ActionRow
+label=Color Schemes
+caption=Campbell, Solarized, and custom palettes
+icon=Palette
+target=Settings.Schemes
+parent=Settings.Terminal
+
+[Settings.Schemes]
+type=View
+title=Color Schemes
+
+[Settings.Schemes.Editor]
+type=Custom
+component=SchemeEditor
+parent=Settings.Schemes
+
+[Settings.Network]
+type=View
+title=Network & Sharing
+
+[Settings.Network.Surface]
+type=Surface
+title=Surfaces
+parent=Settings.Network
+
+[Settings.Network.Surface.External]
+type=Toggle
+label=Allow External Connections
+caption=Bind 0.0.0.0 instead of 127.0.0.1 (exposes to LAN)
+value=false
+storeKey=external
+parent=Settings.Network.Surface
+
+[Settings.Network.Surface.Rdp]
+type=Toggle
+label=RDP Server
+caption=Remote desktop access to Android (roadmap)
+value=false
+storeKey=rdp
+parent=Settings.Network.Surface
+
+[Settings.Network.Surface.Webcast]
+type=Toggle
+label=Webcast Terminal
+caption=Broadcast the live terminal over HTTP
+value=false
+storeKey=webcast
+parent=Settings.Network.Surface
+
+[Settings.Network.Surface.Adb]
+type=Toggle
+label=ADB Loopback
+caption=Self-elevate to uid-2000 shell over localhost
+value=true
+storeKey=adb
+parent=Settings.Network.Surface
+
+[Settings.Permissions]
+type=View
+title=Permissions & Capabilities
+
+[Settings.Permissions.List]
+type=Custom
+component=PermissionsList
+parent=Settings.Permissions
+
+[Settings.About]
+type=View
+title=About
+
+[Settings.About.Header]
+type=Header
+title=Subsystem
+subtitle=Android-native CoreCLR + PowerShell runspace
+copyright=2026 MansfieldPlumbing - MIT
+parent=Settings.About
+
+[Settings.About.Info]
+type=Surface
+title=Runtime
+parent=Settings.About
+
+; Live telemetry — hydrated from /diag (Dg.Snapshot, the one telemetry truth). No baked versions.
+[Settings.About.Info.Telemetry]
+type=Custom
+component=Telemetry
+parent=Settings.About.Info
+
+; Diagnostics — opens the webnn presenter (a window, not a sub-view): open= routes via shell-open.
+[Settings.About.Nav.WebNN]
+type=ActionRow
+label=WebNN probe
+caption=Probe the WebView's WebNN / NPU surface
+icon=Cpu
+open=webnn
+parent=Settings.About
+`;
+
+    function parseINI(str) {
+      const lines = str.split('\n'); const result = {}; let cur = ''; const vars = {};
+      for (let line of lines) {
+        line = line.split(';')[0].trim(); if (!line) continue;
+        if (line.startsWith('[') && line.endsWith(']')) { cur = line.slice(1,-1); result[cur] = {}; }
+        else if (line.includes('=')) {
+          const i = line.indexOf('='); const key = line.slice(0,i).trim(); let val = line.slice(i+1).trim();
+          val = val.replace(/\$([a-zA-Z0-9_]+)/g, (m,v)=> vars[v]!==undefined?vars[v]:m);
+          if (key.startsWith('$')) vars[key.slice(1)] = val; else if (cur) result[cur][key] = val;
+        }
+      }
+      return result;
+    }
+    const data = parseINI(iniString);
+
+    const store = {
+      themeMode: T0.mode, accent: T0.accent, transparency: (T0.transparency==null?1:T0.transparency),
+      barStyle: getConfigSync('ss-barstyle') || 'taskbar',
+      external:false, rdp:false,
+      mica: (window.Themes ? window.Themes.getMica() : true),
+      surfaceBounded: (function(){ try { return getConfigSync('ss-surface-bounded')==='true'; } catch(_){ return false; } })(),
+      surfaceCols: (function(){ try { return parseInt(getConfigSync('ss-surface-cols'))||4; } catch(_){ return 4; } })(),
+      webcast: (function(){ try { return getConfigSync('webcast')==='true'; } catch(_){ return false; } })(),
+      adb: (function(){ try { return getConfigSync('adbLoopback')!=='false'; } catch(_){ return true; } })(),
+    };
+
+    // Reconcile configs from backend registry asynchronously
+    const syncKeys = ['ss-barstyle', 'ss-surface-bounded', 'ss-surface-cols', 'webcast', 'adbLoopback'];
+    syncKeys.forEach(k => {
+      getConfig(k).then(val => {
+        if (val !== null && val !== undefined) {
+          if (k === 'ss-barstyle') store.barStyle = val;
+          else if (k === 'ss-surface-bounded') store.surfaceBounded = val === 'true';
+          else if (k === 'ss-surface-cols') store.surfaceCols = parseInt(val) || 4;
+          else if (k === 'webcast') store.webcast = val === 'true';
+          else if (k === 'adbLoopback') store.adb = val !== 'false';
+        }
+      });
+    });
+
+    window.updateStore = function(key, val) {
+      if (!key) return;
+      store[key] = val;
+      try {
+        if (key==='transparency' && window.Themes) window.Themes.setTransparency(val);
+        else if (key==='themeMode' && window.Themes) window.Themes.setMode(val);
+        else if (key==='mica' && window.Themes) {
+          // Mica = the frosted-glass material. The OFF appearance is registry-defined per theme
+          // (micaOff*), applied by the theme engine — settings holds no opacity literal.
+          window.Themes.setMica(val);
+          setTransparencyEnabled(val);   // the slider only does anything while glass is on
+        }
+        else if (key==='barStyle') { setConfig('ss-barstyle', val); if (window.parent) window.parent.postMessage({ type:'set-barstyle', value: val }, '*'); }
+        else if (key==='surfaceBounded') { setConfig('ss-surface-bounded', String(val)); }
+        else if (key==='surfaceCols') { setConfig('ss-surface-cols', String(Math.round(val))); }
+        else if (key==='webcast') { setConfig('webcast', String(val)); if (bridge) bridge.setWebcast(val); }
+        else if (key==='adb') { setConfig('adbLoopback', String(val)); }
+      } catch(_){}
+    };
+
+    const ICON = {
+      Palette:'<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z"/>',
+      Image:'<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>',
+      Cpu:'<rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9"/><path d="M15 2v2M9 2v2M15 20v2M9 20v2M2 15h2M2 9h2M20 15h2M20 9h2"/>',
+      Wifi:'<path d="M12 20h.01M2 8.82a15 15 0 0 1 20 0M5 12.86a10 10 0 0 1 14 0M8.5 16.43a5 5 0 0 1 7 0"/>',
+      Lock:'<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+      Info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
+      ChevronRight:'<path d="m9 18 6-6-6-6"/>',
+      Terminal:'<path d="m4 17 6-6-6-6"/><path d="M12 19h8"/>',
+      Layout:'<rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/>',
+    };
+    const svg = (n, s=22) => `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[n]||ICON.ChevronRight}</svg>`;
+
+    let navStack = ['Settings.Root']; let animating = false;
+    const vc = document.getElementById('view-container'); const bc = document.getElementById('breadcrumbs');
+
+    function renderCrumbs() {
+      bc.innerHTML = navStack.map((id, i) => {
+        const last = i === navStack.length-1; const cfg = data[id]||{title:id};
+        return `<button class="crumb-btn ${last?'active':''}" ${last?'':`onclick="navTo(${i})"`}><span style="font-size:20px;">${cfg.title}</span></button>${last?'':'<span class="crumb-sep">&gt;</span>'}`;
+      }).join('');
+    }
+    window.navTo = (i) => { if (animating || i>=navStack.length-1) return; navStack = navStack.slice(0,i+1); transition(navStack[navStack.length-1], -1); renderCrumbs(); };
+    window.navFwd = (id) => { if (animating) return; navStack.push(id); transition(id, 1); renderCrumbs(); };
+    // Open a presenter by registry id via the Shell (the shell-open contract — Shell.js message bus).
+    window.shellOpen = (id) => { try { window.parent.postMessage({ type:'shell-open', id }, '*'); } catch(_){} };
+
+    function build(id) {
+      const c = data[id]; if (!c) return '';
+      if (c.type==='Surface') {
+        const kids = Object.keys(data).filter(k => data[k].parent===id).map(k => `<div class="surface-item">${build(k)}</div>`).join('');
+        return `<div class="surface">${c.title?`<div class="surface-header"><h3>${c.title}</h3></div>`:''}<div>${kids}</div></div>`;
+      }
+      if (c.type==='ActionRow') return `<button class="action-row" onclick="${c.open?`shellOpen('${c.open}')`:`navFwd('${c.target}')`}"><div class="left"><div class="icon">${svg(c.icon)}</div><div><div class="label">${c.label}</div>${c.caption?`<div class="caption">${c.caption}</div>`:''}</div></div><div class="icon">${svg('ChevronRight',18)}</div></button>`;
+      if (c.type==='Slider') {
+        const val = store[c.storeKey]!==undefined?store[c.storeKey]:parseFloat(c.value); const mult=c.multiplier?parseFloat(c.multiplier):1;
+        const min=parseFloat(c.min), max=parseFloat(c.max); const pct=((val-min)/(max-min))*100;
+        return `<div class="ctrl-row slider-c" data-key="${c.storeKey}" data-min="${min}" data-max="${max}" data-mult="${mult}" data-unit="${c.unit||''}">
+          <div class="ctrl-header"><span>${c.label}</span><span class="ctrl-val">${(val*mult).toFixed(0)}${c.unit||''}</span></div>
+          <div class="slider-wrap"><input type="range" min="${min}" max="${max}" step="${(max-min)/100}" value="${val}"><div class="sl-track"><div class="sl-fill" style="width:${pct}%"></div></div><div class="sl-thumb" style="left:calc(${pct}% - 9px)"></div></div>
+          ${c.caption?`<div class="ctrl-caption">${c.caption}</div>`:''}</div>`;
+      }
+      if (c.type==='Toggle') {
+        const val = store[c.storeKey]!==undefined?store[c.storeKey]:(c.value==='true');
+        return `<div class="toggle-row"><div><div class="label" style="font-weight:600;color:var(--fg);">${c.label}</div>${c.caption?`<div class="ctrl-caption">${c.caption}</div>`:''}</div><button class="rocker ${val?'on':''}" role="switch" aria-checked="${val}" onclick="this.classList.toggle('on'); this.setAttribute('aria-checked', this.classList.contains('on')); updateStore('${c.storeKey}', this.classList.contains('on'))"><span class="knob"></span></button></div>`;
+      }
+      if (c.type==='RadioGroup') {
+        const val = store[c.storeKey]!==undefined?store[c.storeKey]:c.value;
+        const opts = (c.options||'').split(',').map(o=>{const p=o.split(':');return {k:p[0].trim(),v:(p[1]||p[0]).trim()};});
+        const radios = opts.map(o=>`<label class="radio-label"><input type="radio" name="${c.storeKey}" value="${o.k}" ${val===o.k?'checked':''} onchange="updateStore('${c.storeKey}', this.value)"> ${o.v}</label>`).join('');
+        return `<div class="ctrl-row"><div class="label" style="font-weight:600;color:var(--fg);">${c.label}</div>${c.caption?`<div class="ctrl-caption">${c.caption}</div>`:''}<div class="radio-group">${radios}</div></div>`;
+      }
+      if (c.type==='Header') return `<div style="padding:24px;display:flex;flex-direction:column;align-items:center;text-align:center;"><div style="width:64px;height:64px;background:var(--accent);border-radius:1rem;display:flex;align-items:center;justify-content:center;margin-bottom:16px;border:1px solid rgba(255,255,255,.2);"><span style="font-weight:800;color:var(--accent-fg);font-size:36px;">&gt;_</span></div><h2 style="font-size:20px;font-weight:bold;color:var(--fg);margin:0;">${c.title}</h2>${c.subtitle?`<p style="font-size:14px;color:var(--muted,#9ca3af);margin:4px 0 0;">${c.subtitle}</p>`:''}${c.copyright?`<p style="font-size:12px;color:#6b7280;margin:8px 0 0;">${c.copyright}</p>`:''}</div>`;
+      if (c.type==='KeyValue') return `<div style="padding:12px 20px;display:flex;align-items:center;justify-content:space-between;"><span style="font-size:14px;color:var(--muted,#9ca3af);">${c.label}</span><span style="font-size:14px;color:var(--fg);font-family:monospace;">${c.value}</span></div>`;
+      if (c.type==='Custom') return `<div data-custom="${c.component}"></div>`;
+      return '';
+    }
+
+    function bindEvents(root) {
+      root.querySelectorAll('.slider-c').forEach(sl => {
+        const inp=sl.querySelector('input'), fill=sl.querySelector('.sl-fill'), thumb=sl.querySelector('.sl-thumb'), vd=sl.querySelector('.ctrl-val');
+        inp.oninput = (e) => {
+          const v=parseFloat(e.target.value), min=parseFloat(sl.dataset.min), max=parseFloat(sl.dataset.max), mult=parseFloat(sl.dataset.mult);
+          const pct=((v-min)/(max-min))*100; fill.style.width=pct+'%'; thumb.style.left=`calc(${pct}% - 9px)`; vd.textContent=(v*mult).toFixed(0)+sl.dataset.unit;
+          updateStore(sl.dataset.key, v);
+        };
+      });
+      root.querySelectorAll('[data-custom]').forEach(el => mountCustom(el, el.dataset.custom));
+      setTransparencyEnabled(store.mica);   // reflect current mica state on (re)render
+    }
+
+    // The Transparency slider only has an effect while glass (mica) is on — disable it when mica is off.
+    function setTransparencyEnabled(on) {
+      document.querySelectorAll('.slider-c[data-key="transparency"]').forEach(sl => {
+        const inp = sl.querySelector('input');
+        if (inp) inp.disabled = !on;
+        sl.style.opacity = on ? '' : '0.45';
+        sl.style.pointerEvents = on ? '' : 'none';
+        sl.title = on ? '' : 'Enable Mica Transparency to adjust';
+      });
+    }
+
+    function mountCustom(el, name) {
+      if (name==='SchemeEditor') { if (window.SchemesEditor) window.SchemesEditor.mount(el, { appId:'terminal' }); else el.innerHTML='<div class="ctrl-caption" style="padding:20px;">schemes engine unavailable</div>'; }
+      else if (name==='ThemePicker') mountThemePicker(el);
+      else if (name==='AccentPicker' || name==='ColorKnobs') mountColorKnobs(el);
+      else if (name==='SurfaceActions') mountSurfaceActions(el);
+      else if (name==='PermissionsList') mountPermissions(el);
+      else if (name==='Telemetry') mountTelemetry(el);
+    }
+
+    // About → Runtime: a presenter over /diag (Dg.Snapshot). Every row is read from the live
+    // system on each refresh — this pane holds no version strings or counters of its own.
+    function mountTelemetry(el) {
+      const row = (k, v) => `<div style="padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;"><span style="font-size:14px;color:var(--muted);">${k}</span><span style="font-size:13px;color:var(--fg);font-family:var(--font-mono);text-align:right;">${v ?? '?'}</span></div>`;
+      const uptime = (s) => s >= 3600 ? `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m` : s >= 60 ? `${Math.floor(s/60)}m ${s%60}s` : `${s}s`;
+      async function refresh() {
+        if (!el.isConnected) return;             // pane navigated away — stop the loop
+        try {
+          const d = await (await fetch('/diag', { cache: 'no-store' })).json();
+          const r = d.runtime || {};
+          const vom = (d.vom || []);
+          const vomHandles = vom.reduce((n, o) => n + (o.handles || 0), 0);
+          const vomBytes = vom.reduce((n, o) => n + (o.bytes || 0), 0);
+          el.innerHTML =
+            row('Build', d.build) +
+            row('Uptime', uptime(d.uptimeSec || 0)) +
+            row('PowerShell', r.powershell) +
+            row('.NET', r.dotnet) +
+            row('Android', r.android) +
+            row('Device', r.device) +
+            row('RAM', r.ramGb != null ? r.ramGb + ' GB' : '?') +
+            row('Model', r.activeModel + (d.modelReady ? ` · ${r.modelBackend || ''}` : ' · not loaded')) +
+            row('Registry objects', r.registryCount) +
+            row('VOM', `${vom.length} owners · ${vomHandles} handles · ${(vomBytes/1_000_000).toFixed(1)} MB`) +
+            row('Sessions', `${(d.sessions || []).length} local · ${(d.psrpSessions || []).length} psrp`);
+        } catch (e) {
+          el.innerHTML = `<div class="ctrl-caption" style="padding:20px;">Telemetry unavailable — backend offline.</div>`;
+        }
+        setTimeout(refresh, 5000);               // live while visible; isConnected gates the loop
+      }
+      el.innerHTML = `<div class="ctrl-caption" style="padding:20px;">Reading…</div>`;
+      refresh();
+    }
+
+    // Color Themes — the global chrome theme picker. Bound to the Cm registry via window.Themes (gallery
+    // = Themes.list() ← /themes; selection = Themes.setTheme). Holds NO theme truth of its own; re-renders
+    // when the registry finishes hydrating ('themes-changed'). Each row previews the theme's own var bundle.
+    function mountThemePicker(el) {
+      const Th = window.Themes; if (!Th) { el.innerHTML = '<div class="ctrl-caption" style="padding:20px;">theme engine unavailable</div>'; return; }
+      const cur = (Th.get().theme || Th.DEFAULT_THEME);
+      const themes = Th.list();
+      const swatch = (id) => { const b = (Th.THEMES && Th.THEMES[id]) || {}; const mica = b.micaRgb ? `rgb(${b.micaRgb})` : (b.surface||'#222');
+        return `<span style="display:inline-flex;border-radius:6px;overflow:hidden;border:1px solid var(--border);">
+          <i style="width:18px;height:30px;background:${b.bg||'#000'};display:block;"></i>
+          <i style="width:18px;height:30px;background:${mica};display:block;"></i>
+          <i style="width:18px;height:30px;background:${b.neon||b.accent||'var(--accent)'};display:block;"></i></span>`; };
+      const check = `<span style="color:var(--accent);">${svg('ChevronRight',18).replace('m9 18 6-6-6-6','M20 6 9 17l-5-5')}</span>`;
+      // Appearance: Light / Dark / Auto (Auto follows the system light/dark setting).
+      const seg = [['Light','Light'],['Dark','Dark'],['Auto','Auto']].map(([id,label])=>
+        `<button class="action-row" data-theme="${id}" style="flex:1;justify-content:center;padding:10px 8px;${id===cur?'border-color:var(--accent);background:rgba(127,127,127,.12);font-weight:600;':''}">${label}</button>`).join('');
+      // Custom themes: the preset skins (XP, Zune) + any future saved customs. Selecting one overrides the mode.
+      const cards = themes.filter(t=>t.custom).map(t=>{
+        const b=(Th.THEMES&&Th.THEMES[t.id])||{}; const sub=b.desc||(t.mode==='light'?'Light':'Dark');
+        return `<button class="action-row" data-theme="${t.id}" style="justify-content:space-between;${t.id===cur?'border-color:var(--accent);':''}">
+          <span style="display:flex;align-items:center;gap:12px;">${swatch(t.id)}<span><span class="label" style="font-weight:600;">${t.label}</span>
+            <span class="caption">${sub}</span></span></span>${t.id===cur?check:''}</button>`;
+      }).join('');
+      el.innerHTML = `
+        <div class="ctrl-row"><div class="label" style="font-weight:600;">Appearance</div>
+          <div class="ctrl-caption">Light, Dark, or Auto (follow the system). Reskins every open surface instantly.</div>
+          <div style="display:flex;gap:8px;margin-top:10px;">${seg}</div></div>
+        <div class="ctrl-row" style="margin-top:14px;"><div class="label" style="font-weight:600;">Custom themes</div>
+          <div class="ctrl-caption">Preset skins — selecting one overrides the appearance mode.</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">${cards||'<div class="ctrl-caption">None yet.</div>'}</div></div>`;
+      el.querySelectorAll('[data-theme]').forEach(b => b.onclick = () => { Th.setTheme(b.dataset.theme); mountThemePicker(el); });
+      if (!el._themeSub) { el._themeSub = true; window.addEventListener('themes-changed', () => { if (document.body.contains(el)) mountThemePicker(el); }); }
+    }
+
+    // Atomic color knobs — each chrome color is its OWN override on top of the active theme (persisted via
+    // Themes.override → ss-theme). Taskbar is an "r,g,b" triplet (it tints glass); the rest are hex. Reset
+    // clears the override so the var falls back to the theme's value (start button falls back to accent).
+    function mountColorKnobs(el) {
+      const Th = window.Themes; if (!Th) { el.innerHTML='<div class="ctrl-caption" style="padding:20px;">theme engine unavailable</div>'; return; }
+      const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+      const toHex = (c) => { c=(c||'').trim(); if(c[0]==='#'){ if(c.length===4) return '#'+c[1]+c[1]+c[2]+c[2]+c[3]+c[3]; return c.slice(0,7);} const m=c.match(/(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/); if(m) return '#'+[m[1],m[2],m[3]].map(x=>(+x).toString(16).padStart(2,'0')).join(''); return '#000000'; };
+      const hexToTriplet = (h) => { h=h.replace('#',''); return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)].join(','); };
+      const ov = (Th.get().overrides)||{};
+      // [label, overrideKey, cssVarToPreview, isRgbTriplet]
+      const KNOBS = [
+        ['Accent',        'accent',     '--accent',      false],
+        ['Secondary',     'accent2',    '--accent-2',    false],
+        ['Taskbar',       'taskbarRgb', '--taskbar-rgb', true ],
+        ['Start button',  'neon',       '--neon',        false],
+      ];
+      el.innerHTML = `<div class="ctrl-row"><div class="label" style="font-weight:600;">Colors</div>
+        <div class="ctrl-caption">Each is its own knob, on top of the theme. Start button falls back to Accent.</div>
+        <div style="display:flex;flex-direction:column;gap:2px;margin-top:8px;">
+          ${KNOBS.map(([label,key,vn,isRgb])=>{
+            const raw=css(vn); const hex=toHex(raw); const swatch=isRgb?('rgb('+raw+')'):raw;
+            const overridden = ov[key]!=null;
+            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 2px;">
+              <span class="label" style="font-weight:500;">${label}</span>
+              <span style="display:flex;align-items:center;gap:8px;">
+                <label class="swatch-btn" style="background:${swatch};overflow:hidden;position:relative;margin:0;">
+                  <input type="color" data-key="${key}" data-rgb="${isRgb?1:0}" value="${hex}" style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;"></label>
+                <button class="btn-action" data-reset="${key}" style="padding:4px 10px;font-size:12px;${overridden?'':'opacity:.45;'}">Reset</button>
+              </span></div>`;
+          }).join('')}
+        </div></div>`;
+      el.querySelectorAll('input[type=color]').forEach(ci => ci.oninput = (e)=>{
+        const key=e.target.dataset.key; const isRgb=e.target.dataset.rgb==='1';
+        Th.override(key, isRgb?hexToTriplet(e.target.value):e.target.value); mountColorKnobs(el);
+      });
+      el.querySelectorAll('[data-reset]').forEach(b => b.onclick = ()=>{ Th.override(b.dataset.reset, null); mountColorKnobs(el); });
+    }
+
+    // System Wallpaper — a presenter over \Capability\Shader\* driving the NATIVE wallpaper (Gr's
+    // Wp port) through the registry: Get/Set-SystemWallpaper via /api/exec. The in-app live
+    // wallpaper was retired 2026-06-11; the launcher itself renders the shader catalog now.
+    async function wpExec(cmd) {
+      try {
+        const r = await fetch('/api/exec', { method:'POST', headers:{'Content-Type':'text/plain','X-Subsystem-Cap':(window.AndroidBridge?.getCap?.()||window.__ssCap||'')}, body: cmd });
+        if (!r.ok) return null;
+        const j = await r.json();
+        return (j && j.error) ? null : j;
+      } catch(_) { return null; }
+    }
+    function mountWallpaper(el) {
+      el.innerHTML = '<div class="ctrl-caption" style="padding:20px;">Reading the shader catalog…</div>';
+      (async () => {
+        const cur = await wpExec('Get-SystemWallpaper');
+        if (!el.isConnected) return;
+        if (!cur || !cur.Available) {
+          el.innerHTML = '<div class="ctrl-caption" style="padding:20px;">Shader catalog unavailable — backend offline.</div>';
+          return;
+        }
+        const ids = cur.Available, names = cur.AvailableNames || ids;
+        el.innerHTML = `<div class="surface">
+          <div class="ctrl-row"><div class="label" style="font-weight:600;">Shader playlist</div>
+            <div class="ctrl-caption">Rendered live on the home screen by the system wallpaper engine.</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+              ${ids.map((id,i)=>`<button class="action-row" data-wp="${id}" style="justify-content:flex-start;${id===cur.Playlist?'border-color:var(--accent);':''}">${names[i]||id}</button>`).join('')}
+            </div></div>
+          <button class="action-row" data-wp-apply style="margin:6px 16px 16px;"><div class="left"><div class="icon">${svg('Image')}</div>
+            <div><div class="label">Set as device wallpaper…</div><div class="caption">Opens Android's wallpaper confirm screen</div></div></div></button>
+        </div>`;
+        el.querySelectorAll('[data-wp]').forEach(b => b.onclick = async () => {
+          await wpExec("Set-SystemWallpaper '" + b.dataset.wp.replace(/[^a-z0-9-]/gi,'') + "'");
+          mountWallpaper(el);
+        });
+        const ap = el.querySelector('[data-wp-apply]');
+        if (ap) ap.onclick = () => wpExec('Start-SystemWallpaperPicker');
+      })();
+    }
+
+    // Surface management — open the PowerShell desktop, or reset its widget layout. The Surface is a
+    // capability the registry can launch; here we route through the shell if present, else navigate.
+    function mountSurfaceActions(el) {
+      el.innerHTML = `<div class="surface">
+        <button class="action-row" id="surf-open"><div class="left"><div class="icon">${svg('Layout')}</div>
+          <div><div class="label">Open Surface</div><div class="caption">The PowerShell desktop — widgets on a boundless canvas</div></div></div>
+          <div class="icon">${svg('ChevronRight',18)}</div></button>
+        <div class="surface-item" style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div><div class="label" style="font-weight:600;">Reset layout</div><div class="ctrl-caption">Clear all placed widgets and start fresh</div></div>
+          <button class="btn-action" id="surf-reset">Reset</button></div>
+      </div>`;
+      el.querySelector('#surf-open').onclick = () => {
+        try { if (window.parent && window.parent.Shell && window.parent.Shell.open) { window.parent.Shell.open('surface'); return; } } catch(_){}
+        location.href = '/surface/surface.obp';   // standalone fallback only — framed loads resolve by id above
+      };
+      el.querySelector('#surf-reset').onclick = () => {
+        if (!confirm('Clear all widgets from the Surface?')) return;
+        try { localStorage.removeItem('ss-surface'); } catch(_){}
+        const b = el.querySelector('#surf-reset'); b.textContent = 'Cleared ✓'; setTimeout(()=>b.textContent='Reset', 1500);
+      };
+    }
+
+    let modelsWs=null; const mProgress={};
+    function mountModels(el) { el.innerHTML = `<div id="models-mount" class="surface"><div class="ctrl-row"><div class="ctrl-caption">Connecting...</div></div></div>`; connectModels(); }
+    function connectModels() {
+      modelsWs = new WebSocketClient('/models', {
+        onMessage: (data) => {
+          let f; try { f = JSON.parse(data); } catch { return; }
+          if (f.type === 'manifest') renderModels(f.models);
+          else if (f.type === 'progress') { mProgress[f.id] = { text: f.text, pct: f.pct }; updMP(f.id); }
+          else if (f.type === 'done') { delete mProgress[f.id]; }
+          else if (f.type === 'error') { mProgress[f.id] = { text: 'Error: ' + f.text, pct: null }; updMP(f.id); }
+        },
+        onReconnecting: () => {
+          const mount = document.getElementById('models-mount');
+          if (mount && !mount.querySelector('.surface-item')) {
+            mount.innerHTML = `<div class="ctrl-row"><div class="ctrl-caption">Reconnecting...</div></div>`;
+          }
+        }
+      });
+      modelsWs.connect();
+    }
+    window.modelAction = (a,id)=>{ if(modelsWs) modelsWs.send({action:a,id}); };
+    function renderModels(models) {
+      // A projection of the backend manifest (itself a registry projection — discovery included):
+      // every flag rendered here came over the wire; this view holds no model truth of its own.
+      const m = document.getElementById('models-mount'); if(!m) return; m.innerHTML='';
+      (models||[]).forEach(x => {
+        const card=document.createElement('div'); card.className='surface-item'; card.style.padding='16px'; card.id='model-'+x.id;
+        const badges = [
+          x.active ? `<span class="badge" style="background:var(--accent);color:var(--accent-fg);">Active</span>` : '',
+          x.present ? `<span class="badge" style="background:var(--success);color:var(--accent-fg);">Installed</span>`
+                    : `<span class="badge" style="background:color-mix(in srgb, var(--muted) 25%, transparent);color:var(--fg);">Not downloaded</span>`,
+          x.discovered ? `<span class="badge" style="background:color-mix(in srgb, var(--accent-2) 30%, transparent);color:var(--fg);">Sideloaded</span>` : '',
+        ].join(' ');
+        const actions = [
+          x.present && !x.active ? `<button class="btn-action primary" onclick="modelAction('select','${x.id}')">Use</button>` : '',
+          !x.present && x.downloadable ? `<button class="btn-action primary" onclick="modelAction('download','${x.id}')">Download</button>` : '',
+          x.present && !x.active ? `<button class="btn-action" onclick="modelAction('delete','${x.id}')">Delete</button>` : '',
+        ].join(' ');
+        card.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><div><div class="label" style="font-weight:600;color:var(--fg);">${x.name} ${badges}</div><div class="ctrl-caption">${x.role||''} - ${x.size||''} - ${x.format||''}</div>${x.warn?'<div class="ctrl-caption" style="color:var(--accent-2);">Heavy model - limited RAM may be unstable.</div>':''}</div><div style="display:flex;gap:8px;flex-shrink:0;">${actions}</div></div><div class="mp" style="display:none;margin-top:10px;"><div class="mp-l ctrl-caption"></div><div style="height:6px;background:var(--border);border-radius:4px;overflow:hidden;margin-top:4px;"><div class="mp-b" style="height:100%;width:0;background:var(--accent);transition:width .3s;"></div></div></div>`;
+        m.appendChild(card); if(mProgress[x.id]) updMP(x.id);
+      });
+      if (!(models||[]).length) m.innerHTML='<div class="ctrl-row"><div class="ctrl-caption">No models — backend offline.</div></div>';
+    }
+    function updMP(id){ const c=document.getElementById('model-'+id); if(!c) return; const box=c.querySelector('.mp'),p=mProgress[id]; if(!p){box.style.display='none';return;} box.style.display='block'; c.querySelector('.mp-l').textContent=p.text; if(p.pct!=null) c.querySelector('.mp-b').style.width=Math.min(100,p.pct)+'%'; }
+
+    // Permissions = a PROJECTION of the owner's consent set (\Capability\Consent\* in Cm — the SAME
+    // records the agent's hardware gate checks). No hardcoded permission list: the rows ARE the registry.
+    //   opt-in       — every consent ships OFF; a row is "Off" until the owner grants it.
+    //   informed     — granting first states the capability's blast radius and requires an explicit yes.
+    //   destroyable  — revoke flips the Cm record off (the possession gate denies AT ONCE) and releases
+    //                  the OS layer (self-revoke for runtime perms; a settings deep-link for appops).
+    async function loadConsents() {
+      const all = await wpExec('Get-Capability');           // CapabilityRecord[] (Path/Name/Type/ManifestJson/Enabled)
+      if (!Array.isArray(all)) return [];
+      return all.filter(r => r && r.Type === 'Consent').map(r => {
+        let m = {}; try { m = JSON.parse(r.ManifestJson || '{}'); } catch (_) {}
+        return { path: r.Path, name: r.Name, enabled: !!r.Enabled, description: m.description || '',
+                 kind: m.consentKind || 'capability', androidPerm: m.androidPerm || null };
+      }).sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    // Live grant state: for OS-backed consents the bridge is the truth (the OS can revoke behind our back);
+    // for a pure capability consent the Cm record's enabled flag IS the grant.
+    function consentGranted(c) {
+      try {
+        if (c.kind === 'android')       return !!(bridge && bridge.checkPermission(c.androidPerm));
+        if (c.kind === 'allfiles')      return !!(bridge && bridge.isAllFilesAccess && bridge.isAllFilesAccess());
+        if (c.kind === 'accessibility') return !!(bridge && bridge.isAccessibilityEnabled && bridge.isAccessibilityEnabled());
+      } catch (_) {}
+      return c.enabled;
+    }
+    const qpath = (p) => "'" + String(p).replace(/'/g, "''") + "'";   // PS single-quote (literal backslashes)
+
+    async function grantConsent(c) {
+      // INFORMED: state the blast radius; nothing fires without an explicit yes.
+      if (!confirm(c.name + '\n\n' + c.description + '\n\nGrant this capability?')) return;
+      try {
+        if (c.kind === 'android')            { if (bridge && bridge.requestPermission) bridge.requestPermission(c.androidPerm); }
+        else if (c.kind === 'allfiles')      { if (bridge && bridge.requestAllFilesAccess) bridge.requestAllFilesAccess(); }
+        else if (c.kind === 'accessibility') { if (bridge && bridge.openAccessibilitySettings) bridge.openAccessibilitySettings(); }
+      } catch (_) {}
+      await wpExec('Set-Capability -Path ' + qpath(c.path) + ' -Enabled $true');
+      setTimeout(renderPerms, 1500);    // re-read after the OS dialog settles
+    }
+
+    async function revokeConsent(c) {
+      // DESTROYABLE: the Subsystem authority dies NOW (record off → possession gate denies). Then release
+      // the OS grant: a runtime permission self-revokes on next process death; an appop/accessibility grant
+      // can't self-revoke, so deep-link to the app's settings page.
+      await wpExec('Set-Capability -Path ' + qpath(c.path) + ' -Enabled $false');
+      try {
+        if (c.kind === 'android') {
+          const ok = bridge && bridge.revokePermission && bridge.revokePermission(c.androidPerm);
+          if (!ok && bridge && bridge.openAppSettings) bridge.openAppSettings();
+        } else if ((c.kind === 'allfiles' || c.kind === 'accessibility') && bridge && bridge.openAppSettings) {
+          bridge.openAppSettings();
+        }
+      } catch (_) {}
+      setTimeout(renderPerms, 800);
+    }
+    window.grantConsent = grantConsent; window.revokeConsent = revokeConsent;
+
+    function mountPermissions(el) {
+      el.innerHTML = `<div class="surface"><div class="surface-header"><h3>Permissions &amp; Capabilities</h3></div>
+        <div class="ctrl-caption" style="padding:0 20px 6px;">Every capability is off until you turn it on, tells you what it reaches, and can be revoked.</div>
+        <div id="perms-mount"><div class="ctrl-caption" style="padding:16px 20px;">Reading…</div></div></div>`;
+      renderPerms();
+    }
+    let _consentBusy = false;
+    window.renderPerms = async function () {
+      const m = document.getElementById('perms-mount'); if (!m) return;
+      if (_consentBusy) return; _consentBusy = true;
+      try {
+        const consents = await loadConsents();
+        const mount = document.getElementById('perms-mount'); if (!mount) return;
+        if (!consents.length) { mount.innerHTML = '<div class="ctrl-caption" style="padding:16px 20px;">No consent records — backend offline.</div>'; return; }
+        window._consents = consents;
+        mount.innerHTML = '';
+        consents.forEach((c, i) => {
+          const granted = consentGranted(c);
+          const row = document.createElement('div'); row.className = 'surface-item'; row.style.padding = '14px 20px';
+          const btn = granted
+            ? `<button class="btn-action" onclick="revokeConsent(window._consents[${i}])">Revoke</button>`
+            : `<button class="btn-action primary" onclick="grantConsent(window._consents[${i}])">Grant</button>`;
+          row.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+            <div><div class="label" style="font-weight:600;color:var(--fg);">${c.name}
+              <span class="badge" style="background:${granted ? 'var(--success)' : 'var(--error)'};color:var(--accent-fg);margin-left:6px;">${granted ? 'Granted' : 'Off'}</span></div>
+              <div class="ctrl-caption">${c.description}</div></div>${btn}</div>`;
+          mount.appendChild(row);
+        });
+      } finally { _consentBusy = false; }
+    };
+    // Returning from any OS dialog (perm request / all-files / accessibility / app settings) → re-read live state.
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { try { renderPerms(); } catch(_){} } });
+
+    function transition(targetId, dir) {
+      animating = true;
+      const pane = document.createElement('div'); pane.className='view-pane';
+      const kids = Object.keys(data).filter(k => data[k].parent===targetId);
+      const items = kids.length ? kids : [targetId];
+      pane.innerHTML = '<div>' + items.map(build).join('') + '</div>';
+      vc.appendChild(pane); bindEvents(pane);
+      const old = vc.firstElementChild;
+      if (old !== pane) {
+        const off = dir>0?'60px':'-60px', offL = dir>0?'-60px':'60px';
+        pane.style.transform=`translateX(${off})`; pane.style.opacity='0'; void pane.offsetWidth;
+        pane.style.transform='translateX(0)'; pane.style.opacity='1'; old.style.transform=`translateX(${offL})`; old.style.opacity='0';
+        setTimeout(()=>{ old.remove(); animating=false; }, 250);
+      } else animating=false;
+    }
+
+    // Right-click anywhere = Back (up one breadcrumb). Touch: long-press handled per-control.
+    document.addEventListener('contextmenu', (e) => { e.preventDefault(); if (navStack.length > 1) navTo(navStack.length - 2); });
+
+    renderCrumbs();
+    transition('Settings.Root', 1);
+  </script>
+</body>
+</html>

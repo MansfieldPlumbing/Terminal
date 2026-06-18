@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Subsystem.Analyzers — the NT-invariant analyzer suite (Stage A of the Last Refactor).
+    Roslyn DiagnosticAnalyzers that find "truth held outside the one namespace" mechanically
+    (semantic model, not text) and gate every later commit so the slop cannot return.
+
+    MUST target netstandard2.0: analyzers load into the compiler host, not the Android app.
+    Referenced by src/runspace/Subsystem.csproj as OutputItemType="Analyzer" (never shipped in the APK).
+    Microsoft.CodeAnalysis.CSharp 5.0.0 is <= the SDK compiler (Roslyn 5.7.0), so it loads cleanly.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

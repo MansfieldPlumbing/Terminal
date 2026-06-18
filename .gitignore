@@ -1,0 +1,65 @@
+# Build outputs (redirected to a build sibling out of the source tree; ignored in-tree as a safety net)
+bin/
+obj/
+dist/
+build/
+build.log
+node_modules/
+**/prefab/
+src/runspace/boringssl/
+
+# Binary artifacts — including the root-delivered full-fat builds (subsystem-win.exe, subsystem.apk)
+*.apk
+*.aar
+*.zip
+*.tar.gz
+*.exe
+# Prebuilt native libraries are build outputs — rebuilt from source (e.g. src/native/directport/build.ps1).
+*.dll
+# rename-aside debris from `ss build` self-replace
+*.exe.old
+# the embedded source payload — regenerated on every build, free to recreate
+ss-source.dump
+
+# Local-only siblings at the repo ROOT — NOT in the repo (kept as <drive>\ siblings).
+# Root-anchored (leading /) so they NEVER collaterally ignore an in-tree dir of the same
+# name — e.g. src/runspace/scripts/zoo (the .ps1 cmdlet zoo) must stay tracked + shippable.
+/examples/
+/models/
+/reference/
+/scratch/
+/scripts/
+/temp-build/
+/workorders/
+/notifications/
+
+# Private working docs — the public repo ships the finished artifact, not the workshop.
+# Rewritten docs return here one at a time as they are published.
+/docs/
+/CLAUDE.md
+# Session scratch: handoffs, prompts, the parallel agent-session log, and the hle import staging
+# (folded into canonical files like ss-log.md when published). Root-anchored so AGENTWEBVIEW-HANDOFF.md
+# (already tracked) is unaffected.
+/AGENT-HANDOFF.md
+/HANDOFF-*.md
+/PROMPT-*.md
+/SSRD-HANDOFF.md
+/ss-log-agent.md
+/hle-import/
+
+# Debug captures (safety net if new ones land at root)
+/disp-*.png
+/screen-*.png
+/src/bugreport.txt
+
+# Env / IDE
+.env
+.idea/
+.vs/
+.claude/
+*.user
+*.suo
+
+# Backups
+*robocopy*
+*backup*

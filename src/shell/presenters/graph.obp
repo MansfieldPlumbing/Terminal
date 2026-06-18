@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <base href="/">
+    <link rel="stylesheet" href="/theme.css">
+    <script src="/themes.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Subsystem Visual Graph</title>
+    <style>
+        /* Graph-specific names DERIVE from the canonical theme (theme.css) — no second source of truth.
+           --bg/--border/--accent/--fg come from the active theme; these are the graph's extras. */
+        :root {
+            --grid: color-mix(in srgb, var(--fg) 10%, transparent);
+            --node-bg: var(--surface);
+            --exec: var(--fg);                                  /* exec wires/ports: contrast on any bg */
+            --data: var(--accent);                              /* data wires/ports: the chrome accent */
+            --accent-hover: color-mix(in srgb, var(--accent) 78%, white);
+        }
+        body { margin: 0; overflow: hidden; background: var(--bg); color: var(--fg); font-family: var(--font-sans); display: flex; height: 100vh; }
+        
+        /* Sidebar */
+        #sidebar { width: 260px; background: var(--surface); border-right: 1px solid var(--border); padding: 16px; display: flex; flex-direction: column; z-index: 10; box-sizing: border-box; }
+        h2 { margin: 0 0 16px 0; font-size: 16px; color: var(--fg); }
+        .btn { background: var(--accent); color: white; border: none; padding: 10px; cursor: pointer; border-radius: 6px; font-weight: bold; margin-bottom: 16px; transition: 0.2s; }
+        .btn:hover { background: var(--accent-hover); }
+        .btn.danger { background: var(--error); margin-top: auto; }
+        .btn.danger:hover { background: color-mix(in srgb, var(--error) 80%, white); }
+        
+        .node-category { font-size: 11px; text-transform: uppercase; color: var(--muted); margin: 12px 0 6px 0; font-weight: bold; }
+        .node-item { padding: 10px; background: color-mix(in srgb, var(--fg) 8%, var(--surface)); margin-bottom: 6px; cursor: pointer; border-radius: 4px; font-size: 13px; border: 1px solid transparent; transition: 0.2s; }
+        .node-item:hover { background: color-mix(in srgb, var(--fg) 15%, var(--surface)); border-color: var(--border); }
+        
+        /* Canvas */
+        #canvas-wrapper { flex: 1; position: relative; overflow: hidden; background-color: var(--bg); }
+        #grid-bg {
+            position: absolute; width: 4000px; height: 4000px; left: -2000px; top: -2000px;
+            background-size: 20px 20px;
+            background-image: linear-gradient(to right, var(--grid) 1px, transparent 1px), linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+            pointer-events: none; z-index: 0;
+        }
+        #canvas { position: absolute; width: 100%; height: 100%; top: 0; left: 0; z-index: 2; }
+        svg { position: absolute; width: 100%; height: 100%; pointer-events: none; z-index: 1; top: 0; left: 0; overflow: visible; }
+        
+        path.wire { fill: none; stroke: var(--data); stroke-width: 3; pointer-events: auto; cursor: pointer; transition: stroke-width 0.2s; }
+        path.wire.exec { stroke: var(--exec); stroke-width: 4; }
+        path.wire:hover { stroke-width: 6; stroke: var(--accent); }
+        path.wire-drawing { fill: none; stroke: var(--accent); stroke-width: 3; stroke-dasharray: 6; }
+        
+        /* Nodes */
+        .node { position: absolute; background: var(--node-bg); border-radius: 6px; box-shadow: 0 6px 16px rgba(0,0,0,0.5); border: 1px solid var(--border); width: 220px; z-index: 5; user-select: none; }
+        .node.selected { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent), 0 6px 16px rgba(0,0,0,0.5); z-index: 6; }
+        .node-header { background: var(--accent); padding: 10px 12px; border-radius: 5px 5px 0 0; font-weight: 600; cursor: grab; font-size: 14px; color: white; display: flex; justify-content: space-between; align-items: center; }
+        .node-header:active { cursor: grabbing; }
+        .node-delete { cursor: pointer; opacity: 0.5; transition: 0.2s; }
+        .node-delete:hover { opacity: 1; color: #ffcccc; }
+        .node-body { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+        
+        /* Ports */
+        .port-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; position: relative; min-height: 18px; }
+        .port-label { color: var(--fg); }
+        .port { width: 14px; height: 14px; background: var(--bg); border: 2px solid var(--data); border-radius: 50%; cursor: crosshair; position: absolute; top: 50%; transform: translateY(-50%); box-sizing: border-box; transition: 0.2s; }
+        .port.exec { border-radius: 2px; border-color: var(--exec); }
+        .port.input { left: -19px; }
+        .port.output { right: -19px; }
+        .port:hover { background: var(--data); transform: translateY(-50%) scale(1.2); }
+        .port.exec:hover { background: var(--exec); }
+        .port.connected { background: var(--data); }
+        .port.exec.connected { background: var(--exec); }
+        
+        /* Inputs */
+        input[type="text"] { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--fg); padding: 4px; box-sizing: border-box; border-radius: 3px; font-size: 12px; }
+        
+        /* Toast Overlay */
+        #toast { position: fixed; bottom: 20px; right: 20px; background: rgba(0,0,0,0.8); color: white; padding: 12px 24px; border-radius: 6px; font-size: 14px; z-index: 1000; opacity: 0; pointer-events: none; transition: 0.3s; border-left: 4px solid var(--accent); }
+    </style>
+  <script src="/shell/presenter.js"></script>
+</head>
+<body>
+
+<div id="sidebar">
+    <h2>Subsystem Graph</h2>
+    <button class="btn" onclick="executeGraph()">▶ Execute Graph</button>
+    <a href="#" onclick="try{window.parent.Shell.open('files')}catch(_){};return false;" style="color: var(--muted); font-size: 12px; margin-bottom: 16px; text-decoration: none;">← Back to Files</a>
+    
+    <div style="flex:1; overflow-y: auto;">
+        <div class="node-category">Core</div>
+        <div class="node-item" onclick="spawnNode('Start')">Start Node</div>
+        <div class="node-item" onclick="spawnNode('StringLiteral')">Text Value</div>
+        
+        <div class="node-category">Data</div>
+        <div class="node-item" onclick="spawnNode('GetBattery')">Get-AndroidBattery</div>
+        <div class="node-item" onclick="spawnNode('GetNetwork')">Get-AndroidNetwork</div>
+        <div class="node-item" onclick="spawnNode('GetClipboard')">Get-Clipboard</div>
+        
+        <div class="node-category">Actions</div>
+        <div class="node-item" onclick="spawnNode('ShowToast')">Show-Toast</div>
+        <div class="node-item" onclick="spawnNode('SetFlashlight')">Set-Flashlight</div>
+        <div class="node-item" onclick="spawnNode('InvokeBeep')">Invoke-Beep</div>
+        <div class="node-item" onclick="spawnNode('SendNotification')">Send-Notification</div>
+    </div>
+    
+    <button class="btn danger" onclick="clearGraph()">🗑 Clear Canvas</button>
+</div>
+
+<div id="canvas-wrapper">
+    <div id="grid-bg"></div>
+    <svg id="wires-svg"></svg>
+    <div id="canvas"></div>
+</div>
+
+<div id="toast">Compiled and Executed!</div>
+
+<script>
+    // --- Backend: the shared WS client (auto-reconnect lives in lib/api.js, not re-rolled here).
+    // Classic script (the toolbox uses inline handlers) -> dynamic import, same module either way. ---
+    let ws = null;
+    import('/lib/api.js').then(({ WebSocketClient }) => {
+        ws = new WebSocketClient('/api', {});
+        ws.connect();
+    });
+
+    function showToast(msg) {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.style.opacity = 1;
+        setTimeout(() => el.style.opacity = 0, 3000);
+    }
+
+    // --- Graph Data Structure ---
+    let nodes = {};
+    let wires = [];
+    let nextNodeId = 1;
+
+    // Node palette FOLLOWS the theme (distinct roles, themed hues — never literal hexes).
+    const themeC = (n, d) => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || d;
+    const PAL = {
+        start:   themeC('--success',  '#2da84a'),
+        literal: themeC('--muted',    '#858585'),
+        get:     themeC('--accent',   '#007acc'),
+        action:  themeC('--accent-2', '#c586c0'),
+    };
+
+    const NODE_DEFS = {
+        'Start': {
+            title: 'Start', color: PAL.start,
+            outputs: [{ id: 'execOut', label: 'Exec', type: 'exec' }]
+        },
+        'StringLiteral': {
+            title: 'Text Value', color: PAL.literal,
+            inputs: [{ id: 'val', label: 'Value', type: 'textInput' }],
+            outputs: [{ id: 'valOut', label: 'Text', type: 'data' }]
+        },
+        'GetBattery': {
+            title: 'Get-Battery', color: PAL.get,
+            inputs: [{ id: 'execIn', label: 'Exec', type: 'exec' }],
+            outputs: [{ id: 'execOut', label: 'Exec', type: 'exec' }, { id: 'dataOut', label: 'BatteryData', type: 'data' }]
+        },
+        'GetNetwork': {
+            title: 'Get-Network', color: PAL.get,
+            inputs: [{ id: 'execIn', label: 'Exec', type: 'exec' }],
+            outputs: [{ id: 'execOut', label: 'Exec', type: 'exec' }, { id: 'dataOut', label: 'NetworkData', type: 'data' }]
+        },
+        'GetClipboard': {
+            title: 'Get-Clipboard', color: PAL.get,
+            inputs: [{ id: 'execIn', label: 'Exec', type: 'exec' }],
+            outputs: [{ id: 'execOut', label: 'Exec', type: 'exec' }, { id: 'dataOut', label: 'Text', type: 'data' }]
+        },
+        'ShowToast': {
+            title: 'Show-Toast', color: PAL.action,
+            inputs: [{ id: 'execIn', label: 'Exec', type: 'exec' }, { id: 'msg', label: 'Message', type: 'data' }],
+            outputs: [{ id: 'execOut', label: 'Exec', type: 'exec' }]
+        },
+        'SetFlashlight': {
+            title: 'Set-Flashlight', color: PAL.action,
+            inputs: [{ id: 'execIn', label: 'Exec', type: 'exec' }, { id: 'state', label: 'State', type: 'data' }],
+            outputs: [{ id: 'execOut', label: 'Exec', type: 'exec' }]
+        },
+        'InvokeBeep': {
+            title: 'Invoke-Beep', color: PAL.action,
+            inputs: [{ id: 'execIn', label: 'Exec', type: 'exec' }],
+            outputs: [{ id: 'execOut', label: 'Exec', type: 'exec' }]
+        },
+        'SendNotification': {
+            title: 'Send-Notification', color: PAL.action,
+            inputs: [{ id: 'execIn', label: 'Exec', type: 'exec' }, { id: 'title', label: 'Title', type: 'data' }, { id: 'msg', label: 'Message', type: 'data' }],
+            outputs: [{ id: 'execOut', label: 'Exec', type: 'exec' }]
+        }
+    };
+
+    // --- UI State ---
+    const canvas = document.getElementById('canvas');
+    const svg = document.getElementById('wires-svg');
+    let draggedNode = null;
+    let dragOffset = {x: 0, y: 0};
+    
+    let drawingWire = false;
+    let drawingStartPort = null; // { nodeId, portId, isOutput, type, el }
+    let drawingPathEl = null;
+
+    // --- Node Rendering ---
+    window.spawnNode = function(type, x = 300, y = 200) {
+        const id = 'node_' + nextNodeId++;
+        const def = NODE_DEFS[type];
+        
+        const node = {
+            id, type, x, y,
+            values: {}, // For text inputs
+            inputs: def.inputs || [],
+            outputs: def.outputs || []
+        };
+        nodes[id] = node;
+        
+        const el = document.createElement('div');
+        el.className = 'node';
+        el.id = id;
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+        
+        let html = `
+            <div class="node-header" style="background: ${def.color};" onmousedown="startDragNode(event, '${id}')">
+                <span>${def.title}</span>
+                <span class="node-delete" onclick="deleteNode('${id}')">✕</span>
+            </div>
+            <div class="node-body">
+        `;
+        
+        // Render Inputs
+        node.inputs.forEach(inp => {
+            html += `<div class="port-row">`;
+            if (inp.type === 'textInput') {
+                html += `<input type="text" placeholder="${inp.label}" onchange="updateNodeValue('${id}', '${inp.id}', this.value)" onmousedown="event.stopPropagation()">`;
+            } else {
+                html += `<div class="port input ${inp.type}" id="port_${id}_in_${inp.id}" onmousedown="startWire(event, '${id}', '${inp.id}', false, '${inp.type}')" onmouseup="endWire('${id}', '${inp.id}', false)"></div>`;
+                html += `<span class="port-label" style="margin-left: 8px;">${inp.label}</span>`;
+            }
+            html += `</div>`;
+        });
+        
+        // Render Outputs
+        node.outputs.forEach(out => {
+            html += `<div class="port-row" style="justify-content: flex-end;">`;
+            html += `<span class="port-label" style="margin-right: 8px;">${out.label}</span>`;
+            html += `<div class="port output ${out.type}" id="port_${id}_out_${out.id}" onmousedown="startWire(event, '${id}', '${out.id}', true, '${out.type}')" onmouseup="endWire('${id}', '${out.id}', true)"></div>`;
+            html += `</div>`;
+        });
+        
+        html += `</div>`;
+        el.innerHTML = html;
+        canvas.appendChild(el);
+        return id;
+    }
+
+    window.updateNodeValue = function(nodeId, portId, val) {
+        if(nodes[nodeId]) nodes[nodeId].values[portId] = val;
+    }
+
+    window.deleteNode = function(id) {
+        // Remove connected wires
+        wires = wires.filter(w => w.fromNode !== id && w.toNode !== id);
+        delete nodes[id];
+        document.getElementById(id).remove();
+        redrawWires();
+    }
+
+    window.clearGraph = function() {
+        Object.keys(nodes).forEach(id => deleteNode(id));
+        spawnNode('Start', 300, 200);
+    }
+
+    // --- Drag Logic ---
+    window.startDragNode = function(e, id) {
+        if (e.target.classList.contains('node-delete')) return;
+        draggedNode = id;
+        const el = document.getElementById(id);
+        const rect = el.getBoundingClientRect();
+        const canvasRect = canvas.getBoundingClientRect();
+        dragOffset.x = e.clientX - rect.left + canvasRect.left;
+        dragOffset.y = e.clientY - rect.top + canvasRect.top;
+        
+        // Bring to front
+        document.querySelectorAll('.node').forEach(n => n.classList.remove('selected'));
+        el.classList.add('selected');
+    }
+
+    window.addEventListener('mousemove', e => {
+        if (draggedNode) {
+            const el = document.getElementById(draggedNode);
+            const canvasRect = canvas.getBoundingClientRect();
+            let nx = e.clientX - dragOffset.x;
+            let ny = e.clientY - dragOffset.y;
+            el.style.left = nx + 'px';
+            el.style.top = ny + 'px';
+            nodes[draggedNode].x = nx;
+            nodes[draggedNode].y = ny;
+            redrawWires();
+        }
+        
+        if (drawingWire && drawingStartPort) {
+            const canvasRect = canvas.getBoundingClientRect();
+            const startRect = drawingStartPort.el.getBoundingClientRect();
+            const sx = startRect.left + startRect.width/2 - canvasRect.left;
+            const sy = startRect.top + startRect.height/2 - canvasRect.top;
+            const ex = e.clientX - canvasRect.left;
+            const ey = e.clientY - canvasRect.top;
+            
+            drawingPathEl.setAttribute('d', generateBezier(sx, sy, ex, ey, drawingStartPort.isOutput));
+        }
+    });
+
+    window.addEventListener('mouseup', () => {
+        draggedNode = null;
+        if (drawingWire) {
+            drawingWire = false;
+            if (drawingPathEl) drawingPathEl.remove();
+            drawingPathEl = null;
+            drawingStartPort = null;
+        }
+    });
+
+    // --- Wire Logic ---
+    window.startWire = function(e, nodeId, portId, isOutput, type) {
+        e.stopPropagation();
+        drawingWire = true;
+        drawingStartPort = { nodeId, portId, isOutput, type, el: e.target };
+        
+        drawingPathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        drawingPathEl.classList.add('wire-drawing');
+        if(type === 'exec') drawingPathEl.classList.add('exec');
+        svg.appendChild(drawingPathEl);
+    }
+
+    window.endWire = function(nodeId, portId, isOutput) {
+        if (!drawingWire || !drawingStartPort) return;
+        if (drawingStartPort.nodeId === nodeId) return; // Prevent self-connection
+        if (drawingStartPort.isOutput === isOutput) return; // Must be output -> input
+        
+        // Find target port type
+        const targetNode = nodes[nodeId];
+        const portList = isOutput ? targetNode.outputs : targetNode.inputs;
+        const targetPort = portList.find(p => p.id === portId);
+        
+        if (drawingStartPort.type !== targetPort.type) return; // Type mismatch
+        
+        const fromNode = drawingStartPort.isOutput ? drawingStartPort.nodeId : nodeId;
+        const fromPort = drawingStartPort.isOutput ? drawingStartPort.portId : portId;
+        const toNode = drawingStartPort.isOutput ? nodeId : drawingStartPort.nodeId;
+        const toPort = drawingStartPort.isOutput ? portId : drawingStartPort.portId;
+        
+        // Exec ports can only have one outgoing wire
+        if (drawingStartPort.type === 'exec') {
+            wires = wires.filter(w => !(w.fromNode === fromNode && w.fromPort === fromPort));
+            // Inputs can also only have one incoming exec wire
+            wires = wires.filter(w => !(w.toNode === toNode && w.toPort === toPort));
+        }
+        // Data inputs can only have one incoming wire
+        if (drawingStartPort.type === 'data') {
+            wires = wires.filter(w => !(w.toNode === toNode && w.toPort === toPort));
+        }
+        
+        wires.push({ fromNode, fromPort, toNode, toPort, type: drawingStartPort.type });
+        updatePortStyles();
+        redrawWires();
+    }
+
+    window.removeWire = function(idx) {
+        wires.splice(idx, 1);
+        updatePortStyles();
+        redrawWires();
+    }
+
+    window.updatePortStyles = function() {
+        document.querySelectorAll('.port').forEach(el => el.classList.remove('connected'));
+        wires.forEach(w => {
+            const outEl = document.getElementById(`port_${w.fromNode}_out_${w.fromPort}`);
+            const inEl = document.getElementById(`port_${w.toNode}_in_${w.toPort}`);
+            if (outEl) outEl.classList.add('connected');
+            if (inEl) inEl.classList.add('connected');
+        });
+    }
+
+    window.redrawWires = function() {
+        // Keep drawing wire if active
+        const paths = Array.from(svg.children).filter(c => !c.classList.contains('wire-drawing'));
+        paths.forEach(p => p.remove());
+        
+        const canvasRect = canvas.getBoundingClientRect();
+        
+        wires.forEach((w, idx) => {
+            const outEl = document.getElementById(`port_${w.fromNode}_out_${w.fromPort}`);
+            const inEl = document.getElementById(`port_${w.toNode}_in_${w.toPort}`);
+            if (!outEl || !inEl) return;
+            
+            const outRect = outEl.getBoundingClientRect();
+            const inRect = inEl.getBoundingClientRect();
+            
+            const sx = outRect.left + outRect.width/2 - canvasRect.left;
+            const sy = outRect.top + outRect.height/2 - canvasRect.top;
+            const ex = inRect.left + inRect.width/2 - canvasRect.left;
+            const ey = inRect.top + inRect.height/2 - canvasRect.top;
+            
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.classList.add('wire');
+            if (w.type === 'exec') path.classList.add('exec');
+            path.setAttribute('d', generateBezier(sx, sy, ex, ey, true));
+            path.onclick = (e) => { e.stopPropagation(); removeWire(idx); };
+            svg.appendChild(path);
+        });
+    }
+
+    window.generateBezier = function(sx, sy, ex, ey, startIsOutput) {
+        // Standard bezier curve for node editors
+        const curveOffset = Math.max(Math.abs(ex - sx) * 0.5, 40);
+        const cx1 = startIsOutput ? sx + curveOffset : sx - curveOffset;
+        const cx2 = startIsOutput ? ex - curveOffset : ex + curveOffset;
+        return `M ${sx} ${sy} C ${cx1} ${sy}, ${cx2} ${ey}, ${ex} ${ey}`;
+    }
+
+    // --- COMPILER ---
+    window.executeGraph = function() {
+        // 1. Find Start Node
+        const startNodeId = Object.keys(nodes).find(id => nodes[id].type === 'Start');
+        if (!startNodeId) return showToast("Error: No Start Node found!");
+        
+        let script = "";
+        let currentNode = startNodeId;
+        
+        // Helper to resolve data inputs
+        function resolveDataInput(nodeId, portId) {
+            const wire = wires.find(w => w.toNode === nodeId && w.toPort === portId);
+            if (!wire) return "$null";
+            
+            const sourceNode = nodes[wire.fromNode];
+            if (sourceNode.type === 'StringLiteral') {
+                const val = sourceNode.values['val'] || "";
+                return `"${val.replace(/"/g, '`"')}"`;
+            }
+            if (sourceNode.type === 'GetBattery') {
+                script += `$tmp_${sourceNode.id} = Get-AndroidBattery\n`;
+                return `$tmp_${sourceNode.id}`;
+            }
+            if (sourceNode.type === 'GetNetwork') {
+                script += `$tmp_${sourceNode.id} = Get-AndroidNetwork\n`;
+                return `$tmp_${sourceNode.id}`;
+            }
+            if (sourceNode.type === 'GetClipboard') {
+                script += `$tmp_${sourceNode.id} = Get-Clipboard\n`;
+                return `$tmp_${sourceNode.id}`;
+            }
+            return "$null";
+        }
+
+        // Traverse Exec Wires
+        let visited = new Set();
+        while (currentNode) {
+            if (visited.has(currentNode)) { script += "# Cycle detected\n"; break; }
+            visited.add(currentNode);
+            
+            const node = nodes[currentNode];
+            
+            if (node.type === 'ShowToast') {
+                const msg = resolveDataInput(node.id, 'msg');
+                script += `Show-Toast -Message ${msg}\n`;
+            } else if (node.type === 'SetFlashlight') {
+                const state = resolveDataInput(node.id, 'state');
+                script += `Set-Flashlight -State ${state !== "$null" ? state : '"Toggle"'}\n`;
+            } else if (node.type === 'InvokeBeep') {
+                script += `Invoke-Beep\n`;
+            } else if (node.type === 'SendNotification') {
+                const title = resolveDataInput(node.id, 'title');
+                const msg = resolveDataInput(node.id, 'msg');
+                script += `Send-AndroidNotification -Title ${title} -Text ${msg}\n`;
+            }
+            // Note: Get nodes are evaluated lazily by resolveDataInput above, but if they have exec wires, we just continue.
+            
+            // Find next exec node
+            const nextWire = wires.find(w => w.fromNode === currentNode && w.fromPort === 'execOut' && w.type === 'exec');
+            currentNode = nextWire ? nextWire.toNode : null;
+        }
+        
+        if (script.trim() === "") {
+            script = "Write-Output 'Graph executed (Empty script)'";
+        }
+        
+        console.log("COMPILED SCRIPT:\n", script);
+        
+        // Send to backend via the shared WS client (send() returns false while reconnecting).
+        if (ws && ws.send(script)) {
+            showToast("Script sent to Subsystem API!");
+        } else {
+            showToast("Error: Not connected to backend.");
+        }
+    }
+
+    // --- Init ---
+    spawnNode('Start', 300, 200);
+
+    // Conformance (REGISTRY-SPEC §6/§8): the graph's verbs, presented by the Shell's Menu/Charms.
+    if (window.Presenter) {
+        Presenter.menu('graph', [
+            { menu: 'file', verb: 'execute', label: 'Execute Graph' },
+            { menu: 'edit', verb: 'clear',   label: 'Clear Canvas' },
+        ]);
+        Presenter.onVerb((v) => {
+            if (v === 'execute') executeGraph();
+            else if (v === 'clear') clearGraph();
+        });
+    }
+
+</script>
+</body>
+</html>

@@ -1,0 +1,133 @@
+/* Shell.css — layout for the assembler root: the compositing bands. THEME VARS ONLY. The Shell owns
+   stacking, not look (objects bring their own theme-var styles).
+   Bands:  backdrop(0)  <  stage/windows(10)  <  taskbar(400)  <  menu(500)  <  red-X(600). */
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#shell-root { position: fixed; inset: 0; overflow: hidden; }
+
+/* Backdrop — the bottom band: a STATIC themed gradient (zero GPU; the live shader layer is the
+   system wallpaper now — Gr's Wp port renders \Capability\Shader\* on the launcher). ABSOLUTE +
+   pinned: fills shell-root (the full viewport) and never moves with the taskbar dock or stage inset. */
+.shell-backdrop { position: absolute; inset: 0; z-index: 0;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%); }
+
+/* Stage — open window objects live here, inset away from the docked taskbar (56px). */
+.shell-stage { position: absolute; top: 56px; left: 0; right: 0; bottom: 0; z-index: 10; }
+#shell-root[data-bar="bottom"] .shell-stage { top: 0; bottom: 56px; }
+
+/* The bottom-docked taskbar is pinned to the PHYSICAL viewport bottom (owner directive: the bar is
+   ALWAYS at the bottom edge and never rides the IME — under the keyboard is acceptable, floating
+   mid-screen is not). position:fixed escapes the root's visual-viewport pinning (_bindViewport):
+   #shell-root carries no transform, so fixed children anchor to the layout viewport, not the
+   shrunken root. Taskbar.css still supplies left/right/bottom:0 and z-index. */
+#shell-root[data-bar="bottom"] .object-taskbar { position: fixed; }
+
+/* The desktop — the Surface as the stage's RESTING LAYER: always present, full-bleed, under every
+   window. Transparent background so the backdrop band shows through it (the surface paints its own
+   cards only). It receives input exactly when no window is active (inactive frames are
+   pointer-transparent). */
+.shell-desktop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+}
+
+.content-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+}
+.content-frame.active { opacity: 1; pointer-events: auto; }
+
+/* Start screen — fixed DEAD CENTER of the viewport, immovable. It does NOT reflow with the bar dock or
+   the stage inset; it is pinned to one point and stays there. Entrance is opacity-only (no movement). */
+.shell-start {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  user-select: none;
+  z-index: 5;
+}
+.shell-start-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.4), 0 1px 3px rgba(0,0,0,0.5);
+  animation: shell-start-in .3s ease both;
+}
+.shell-start-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg);
+  transition: opacity .15s ease;
+}
+.shell-start-icon.fading { opacity: 0; }
+.shell-start-icon .ic { display: block; width: 18px; height: 18px; }
+@keyframes shell-start-in  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes shell-icon-flip { 0% { transform: rotateX(0deg); opacity: 1; } 50% { transform: rotateX(90deg); opacity: 0.2; } 100% { transform: rotateX(0deg); opacity: 1; } }
+
+/* Red-X — ALWAYS present (we own Android's left/right swipe-nav, so this is the only way out). It closes
+   the active window, or exits the app when nothing is open. A square the height of the taskbar (56px),
+   flush in the top-right corner. (#c42b1c is a functional one-off, theme-exempt like battery red.) */
+.shell-close {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 600;
+  box-sizing: border-box;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-left: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background-color: rgba(0, 0, 0, 0.40);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: 17px;
+  cursor: pointer;
+  transition: background-color .2s ease, color .2s ease, width .2s ease, height .2s ease, border-radius .2s ease;
+}
+/* Bar on the BOTTOM → there's no top bar for the red-X to complete, so it becomes a stylish smaller
+   floating symbol tucked into the corner (rounded bottom-left, smaller hit-box, below the status bar) —
+   the ui-final close treatment. Bar on TOP keeps the full 56px square flush with the taskbar's corner. */
+#shell-root[data-bar="bottom"] .shell-close {
+  top: 0;                 /* flush to the corner — we're fullscreen/immersive, so don't inset by the
+                            safe-area (the cutout inset stays non-zero even with the status bar hidden,
+                            which left a gap above the X). The cutout is a top-CENTER punch-hole anyway. */
+  width: 48px;
+  height: 40px;
+  font-size: 14px;
+  border-bottom-left-radius: 14px;
+}
+.shell-close:hover  { background-color: #c42b1c; color: #fff; }
+.shell-close:active { background-color: #a62417; }

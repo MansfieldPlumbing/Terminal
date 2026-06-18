@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AppWidget provider metadata (referenced by SubsystemWidgetProvider's [MetaData] attribute). On API 31+
+     (this build targets minSdk 36) the picker renders the SCALABLE previewLayout and ignores previewImage;
+     previewImage stays as the API-30-and-lower fallback. previewLayout points at the same layout as
+     initialLayout (the recommended pattern), so the picker shows the real card, not just the app icon — that
+     missing previewLayout is why the widget did not surface in the picker. updatePeriod 0 = no system polling;
+     the widget updates on placement (and later via an explicit push). -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="180dp"
+    android:minHeight="40dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="40dp"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/subsystem_widget"
+    android:previewLayout="@layout/subsystem_widget"
+    android:previewImage="@mipmap/appicon"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen" />

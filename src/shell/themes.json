@@ -1,0 +1,46 @@
+{
+  "Light": {
+    "id": "Light", "label": "Light", "mode": "light", "wallpaper": "solid", "desc": "Clean light",
+    "bg": "#ffffff", "surface": "#f4f5f7", "fg": "#1a1a1a", "muted": "#6b7280",
+    "accent": "#2563eb", "accent2": "#3b82f6", "accentFg": "#ffffff",
+    "border": "rgba(26,26,26,0.12)",
+    "taskbarRgb": "240,241,243", "taskbarFg": "#1a1a1a",
+    "neon": "#2563eb", "neonFg": "#ffffff",
+    "success": "#16a34a", "error": "#dc2626",
+    "micaRgb": "250,250,252", "micaOpacity": 0.80, "micaStrongOpacity": 0.92, "micaBlur": "26px", "bgOpacity": 0.04,
+    "micaOffOpacity": 1, "micaOffStrongOpacity": 1
+  },
+  "Dark": {
+    "id": "Dark", "label": "Dark", "mode": "dark", "wallpaper": "solid", "desc": "Clean dark",
+    "bg": "#0e0f12", "surface": "#15171c", "fg": "#f2f2f2", "muted": "#8b93a3",
+    "accent": "#2563eb", "accent2": "#3b82f6", "accentFg": "#ffffff",
+    "border": "rgba(255,255,255,0.10)",
+    "taskbarRgb": "20,22,26", "taskbarFg": "#f2f2f2",
+    "neon": "#2563eb", "neonFg": "#ffffff",
+    "success": "#10b981", "error": "#ef4444",
+    "micaRgb": "20,22,26", "micaOpacity": 0.72, "micaStrongOpacity": 0.92, "micaBlur": "28px", "bgOpacity": 0.22,
+    "micaOffOpacity": 1, "micaOffStrongOpacity": 1
+  },
+  "XP": {
+    "id": "XP", "label": "XP", "mode": "light", "wallpaper": "sky", "desc": "Windows XP", "default": true,
+    "bg": "#ffffff", "surface": "#f2f3f6", "fg": "#15243f", "muted": "#5a6b88",
+    "accent": "#2a6cf0", "accent2": "#d80073", "accentFg": "#ffffff",
+    "border": "rgba(21,36,63,0.12)",
+    "taskbarRgb": "38,97,201", "taskbarFg": "#ffffff",
+    "neon": "#4ea72e", "neonFg": "#ffffff",
+    "success": "#2e7d32", "error": "#d32f2f",
+    "micaRgb": "248,249,251", "micaOpacity": 0.80, "micaStrongOpacity": 0.92, "micaBlur": "26px", "bgOpacity": 0.04,
+    "micaOffOpacity": 1, "micaOffStrongOpacity": 1
+  },
+  "Zune": {
+    "id": "Zune", "label": "Zune", "mode": "dark", "wallpaper": "solid", "desc": "Dark · orange",
+    "bg": "#141414", "surface": "#1c1c1c", "fg": "#f2f2f2", "muted": "#8a8a8a",
+    "accent": "#f7630c", "accent2": "#ff9248", "accentFg": "#ffffff",
+    "border": "rgba(255,255,255,0.10)",
+    "taskbarRgb": "20,20,20", "taskbarFg": "#f2f2f2",
+    "neon": "#f7630c", "neonFg": "#ffffff",
+    "success": "#10b981", "error": "#ef4444",
+    "micaRgb": "20,20,20", "micaOpacity": 0.72, "micaStrongOpacity": 0.92, "micaBlur": "28px", "bgOpacity": 0.22,
+    "micaOffOpacity": 1, "micaOffStrongOpacity": 1
+  }
+}

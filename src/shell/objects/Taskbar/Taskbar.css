@@ -1,0 +1,111 @@
+/* Taskbar.css — the one bar. THEME VARS ONLY. `position` (top|bottom) is set on the host; the Shell
+   docks it. Chips are absolutely positioned and driven by the spring loop in Taskbar.js. */
+
+.object-taskbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 400;
+}
+.object-taskbar[data-position="top"]    { top: 0; }
+.object-taskbar[data-position="bottom"] { bottom: 0; }
+
+/* IME open: the bottom-docked bar is position:fixed (Shell.css) and so anchors to the layout viewport,
+   which `interactive-widget=resizes-content` shrinks above the keyboard — lifting the bar with it. Push
+   it back DOWN by the keyboard height (--ime-offset, set on #shell-root by Shell._bindViewport) so it
+   rests at the physical bottom, behind the IME (owner directive: the bar never floats over the keyboard).
+   --ime-offset is only present while the keyboard is open, so the bar sits flush the rest of the time. */
+#shell-root[data-bar="bottom"] .object-taskbar[data-position="bottom"] {
+  transform: translateY(var(--ime-offset, 0px));
+}
+
+.taskbar {
+  height: 56px;
+  display: flex;
+  align-items: stretch;
+  background-color: rgba(var(--taskbar-rgb), calc(var(--mica-opacity) * var(--transparency)));
+  backdrop-filter: blur(var(--mica-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--mica-blur)) saturate(180%);
+  font-family: var(--font-sans);
+}
+/* Edge line as an INSET shadow, not a border, so it never adds to the 56px height — otherwise the bar
+   renders 57px and pokes 1px out from under the (56px) red-X. (Shell.css .shell-close.) */
+.object-taskbar[data-position="top"]    .taskbar { box-shadow: inset 0 -1px 0 var(--border); }
+.object-taskbar[data-position="bottom"] .taskbar { box-shadow: inset 0  1px 0 var(--border); }
+
+/* The launch button — a 56px square hit-box, sibling to the red-X (Shell.css .shell-close): transparent
+   at rest, LIGHTS UP a solid color on hover/active. The red-X lights red (close); this lights NEON green
+   (var(--neon) — a themeable, registry-seeded color). Same square language, different signal color. */
+.taskbar-launch {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  border: none;
+  background-color: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  transition: color .15s ease;
+}
+/* The "lights up" state is a CENTERED squircle (same 46px/radius as a chip), not a full-bleed square —
+   so the launch button reads as the same shape language as the chips and the glyph stays centered. */
+.taskbar-launch::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46px;
+  height: 46px;
+  transform: translate(-50%, -50%);
+  border-radius: 14px;
+  background-color: var(--neon);          /* the start button is ALWAYS its color (XP green / accent) */
+  transition: filter .15s ease, transform .12s ease;
+  z-index: 0;
+}
+.taskbar-launch:hover::before  { filter: brightness(1.12); }
+.taskbar-launch:active::before { filter: brightness(0.88); transform: translate(-50%, -50%) scale(0.94); }
+.taskbar-launch { color: var(--neon-fg); }   /* glyph contrasts against the colored start button */
+.taskbar-launch .ic { display: block; position: relative; z-index: 1; }
+/* Dock swap — a quick morph when the bar re-docks (hamburger <-> 9-dot grid), not a loop. */
+.taskbar-launch.swap .ic { animation: tb-launch-swap .2s cubic-bezier(0.16,1,0.3,1); }
+@keyframes tb-launch-swap { 0% { transform: scale(0.6) rotate(-12deg); opacity: 0; } 100% { transform: none; opacity: 1; } }
+
+/* Chip strip — relative box; chips float over it, placed by the spring (translate x,-50%). */
+.taskbar-strip {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 56px;
+  overflow: hidden;
+}
+
+.taskbar-chip {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--taskbar-fg);
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 600;
+  cursor: pointer;
+  transform: translate(0, -50%);
+  transition: background-color .2s ease;
+  touch-action: none;
+}
+/* No squircle AND no underline behind the icons — both read as noise (the rounded inset shadow left a
+   bottom sliver). Active vs inactive is pure opacity now — zero shape. */
+.taskbar-chip { opacity: .62; }
+.taskbar-chip.active { opacity: 1; }
+
+.taskbar-chip-icon { width: 28px; height: 28px; object-fit: contain; pointer-events: none; }

@@ -1,0 +1,105 @@
+{
+  "_about": "The closed vocabulary + component DAG (docs/CONTRACT.md is the law; this file is the data). One file, two consumers: Subsystem.Analyzers reads it as an AdditionalFile (SS011-SS016); the Registrar seeds it into the namespace at boot (\\System\\Components). Registering anything here is a deliberate event.",
+  "version": 0,
+  "root": "Ss",
+  "rootToday": "Subsystem",
+
+  "components": {
+    "Vom": { "name": "Virtual Object Manager",  "dependsOn": ["Dg"],        "folder": "src/runspace/Vom/",             "note": "the kernel; the one node type lives here; logs through Dg" },
+    "Dg":  { "name": "Diagnostics",             "dependsOn": [],            "folder": "src/runspace/Diagnostics/",     "note": "records + ring; sinks are host drivers. Today reaches Rb/Rs/SessionManager - ratchet R3" },
+    "Cm":  { "name": "Configuration Manager",   "dependsOn": ["Vom", "Dg"], "folder": "src/runspace/Cm/",              "note": "volatile + durable planes; durable plane is a driver grant. Today probes MainActivity - ratchet R3" },
+    "Pp":  { "name": "Plug-and-Play Manager",   "dependsOn": ["Cm", "Dg"],  "folder": "src/runspace/Pp/",              "note": "provisioning engine: Extract/Apply templates" },
+    "Rb":  { "name": "RuntimeBroker",           "dependsOn": ["Vom", "Cm", "Dg"], "folder": "src/runspace/RuntimeBroker/",   "note": "brokers inference runtimes (LiteRT/ONNX/GGML) behind one Runtime contract; routes/authorizes/owns lifecycle, zero knobs" },
+    "Rs":  { "name": "Remote Sessions",         "dependsOn": ["Vom", "Cm", "Dg"], "folder": "src/runspace/Host/Rs.cs",       "note": "the PSRP subsystem (Rs.cs:14); single file pending Host/ assignment" },
+    "Device":  { "name": "Device Drivers",      "dependsOn": ["Vom", "Cm", "Dg"], "note": "hardware/OS interop drivers, each mounted as a VOM leaf (Light, Morse, Surfaces, WebDrive, VomInterop). Registered for the namespace grammar (SS011); FOLDER OMITTED so SS014 DAG attribution stays DEFERRED — these drivers legitimately reach the host (MainActivity) today; their reference cleanup is a separate migration, not this addition." },
+    "Pwsh":    { "name": "PowerShell Surface",  "dependsOn": ["Vom", "Cm", "Dg"], "note": "the in-process runspace surface: SessionManager, ReplEngine, Translator, HelpSystem, cmdlet families. Folder omitted — SS014 deferred (same reason as Device)." },
+    "Cmdlets": { "name": "Cmdlet Families",      "dependsOn": ["Pwsh"],            "note": "PSCmdlet families under Pwsh (sub-namespace Subsystem.Pwsh.Cmdlets). Registered so the grammar resolves EVERY segment; folder omitted (SS014 deferred)." },
+    "Zoo":     { "name": "Cmdlet Zoo",          "dependsOn": ["Cmdlets"],         "note": "asset-loaded auxiliary cmdlets (sub-namespace Subsystem.Pwsh.Cmdlets.Zoo). Folder omitted (SS014 deferred)." }
+  },
+
+  "hostPaths": ["src/runspace/windows/", "src/runspace/MainActivity.cs", "src/runspace/Services/",
+                "src/runspace/Widgets/", "src/tools/", "src/analyzers/"],
+
+  "_synchronousCore_about": "Components that are brutally synchronous — SS018 refuses async/await + sync-over-async here. The core is real threads + Fence handoff (push, best-effort, copy-then-share); async legitimately lives at the seams (Rb=LLM, Rs=pwsh, Host=web, Adb=network). This list ratchets OUTWARD deliberately as a seam is made synchronous — it never silently widens.",
+  "synchronousCore": ["Vom", "Dg", "Cm", "Pp"],
+
+  "unassigned": {
+    "_about": "Code that exists but whose component registration is a pending deliberate decision - do NOT coin codes for these in PRs.",
+    "areas": [
+      "Host/ (ObpHost, ProjectionServer, Registrar, SubsystemApi, ModelsApi, Firewall) - ratchet R7",
+      "Adb/", "Widgets/ (Android head)", "Services/ (Android head)", "RuntimeBroker satellites (ModelManager, ModelCatalog, AgentSessionTable, Hud)"
+    ]
+  },
+
+  "types": {
+    "shipped": ["Bind", "Port"],
+    "suffixes": ["Object", "Header", "Body", "Node", "Entry", "Table", "Record", "Block",
+                 "Region", "Handle", "Owner", "Token", "Fence", "Hive", "Manifest", "Grant",
+                 "Descriptor", "Routine", "Dispatch", "Information", "Value", "Directory",
+                 "Type", "Callback"],
+    "_note": "Descriptor/Routine/Dispatch/Information/Value/Directory/Type/Callback adopted 2026-06-12 from the primary-sourced NT taxonomy (SECURITY_DESCRIPTOR, IoCompletionRoutine, DispatchRoutine, FILE_BASIC_INFORMATION, CM_KEY_VALUE, OBJECT_DIRECTORY, OBJECT_TYPE, CALLBACK_OBJECT)."
+  },
+
+  "verbs": {
+    "_doc": "SS013 requires every C# method name to START with a verb from one of the three buckets below (the FIRST PascalCase word only; the rest is the noun). A leading word in NONE of them fails the build. This governs C# method names ONLY — it does not touch the PowerShell the model runs at runtime, which uses pwsh's own Get-Verb set freely.",
+    "approved": ["Create", "Open", "Close", "Query", "Set", "Enumerate", "Parse", "Read", "Write",
+                 "Register", "Unregister", "Reference", "Dereference", "Alloc", "Free", "Spawn",
+                 "Terminate", "Signal", "Wait", "Initialize", "Load", "Rehydrate", "Project",
+                 "Mount", "Bind", "Grant", "Revoke", "Resolve", "Extract", "Apply"],
+    "_approvedDoc": "PREFER these — the canonical NT-mechanism vocabulary (Alloc/Free/Spawn/Mount/Bind/Grant/Signal/Wait). The blessed, deliberate verbs the system is built on.",
+    "pwsh": ["Get", "Start", "Stop", "Suspend", "Resume", "Send", "Select", "Update", "Push",
+             "Invoke", "Rename", "Build", "Clear"],
+    "_pwshDoc": "PowerShell cmdlet verbs (Get-Verb-aligned), kept in their OWN bucket because they exist for a different reason: C# PSCmdlet classes must be named to match the shell (Invoke-Agent, Get-AdbProcess, Start-X). Allowed for cmdlet-facing names; non-cmdlet C# should still prefer the approved NT verb (Get->Query).",
+    "triage": ["List", "Snapshot", "Recent", "Ensure", "Log", "Warn", "Error", "Info",
+               "Trace", "Debug", "Describe", "Exec", "Run", "Execute", "Self", "Local", "Is",
+               "Bring", "Report", "Delete", "Active", "Record", "Refresh", "Reset", "Should",
+               "Smoke", "Speak", "Stream", "Total", "Totals", "Try", "Use", "Plan", "On", "All",
+               "Allocate", "Append", "Assemble", "Auto", "Cancel", "Cpu", "Demote", "Drop",
+               "Flush", "Generate", "Granted", "Lookup", "Migrate", "Wrap"],
+    "_triageDoc": "Verbs in the code but NOT blessed — a cleanup backlog to drain toward 'approved' or remove. They pass the gate today so the ratchet tracks every existing prefix, but each owes a rename: 'Describe' is retiring for 'contextualize'; 'List'->'Enumerate', 'Delete'->'Free'/'Remove', 'Run'/'Exec'/'Execute'->'Invoke'; predicates (Is/Should/Granted/Active) and nouns (Total/Cpu/Local) owe a Query/measure rename."
+  },
+
+  "banned": {
+    "suffixes": ["Helper", "Util", "Utils", "Utility", "Factory", "Repository", "Provider",
+                 "Impl", "Wrapper", "Handler", "Listener", "Controller", "Orchestrator",
+                 "Coordinator", "Strategy", "Visitor", "DTO", "DAO", "Bean", "Store",
+                 "Processor", "Facade"],
+    "contextWords": ["Global", "Local", "Legacy", "New", "Old", "V2", "Compat", "Ex2", "Temp"],
+    "nouns": ["Endpoint", "Service2", "Mesh"],
+    "alwaysFlag": ["brain", "membrane", "neuron", "synapse", "manifold", "soul", "persona", "cosplay", "larp", "dumb", "blessed", "sovereign", "hack", "heist", "winning", "commandment", "heuristic", "religious", "slop", "ouroboros", "diary", "litertlm-android", "Com.Google.AI.Edge.Litertlm"],
+    "commentPatterns": ["lol", "lmao", "wtf", "hacky", "kludge", "blazingly", "supercharged", "obviously", "duh", "magic number"],
+    "_noteHygiene": "SS017 lexical hygiene (the anti-slop dict), SCOPED to names — not a string scraper. alwaysFlag = anthropomorphic/metaphor words refused in IDENTIFIERS (a Brain/Soul/Ouroboros TYPE is the ontology error: mechanism, never metaphor). NOT scraped from comments or string literals — prose may legitimately name a concept it tells you not to encode. commentPatterns = casual/inflammatory comment tells (lol/hacky/blazingly) refused in COMMENTS. contextWords are vague qualifiers (Legacy/New/V2/Temp); platform names (Win/Android/...) are legitimate and were removed 2026-06-17 (banning 'Android' in an Android project is absurd; mechanism-naming stays a convention, hosts are exempt). Both ride the census ratchet: existing hits baseline, NEW slop bleeds red. (litertlm-android/Com.Google.AI.Edge.Litertlm are now inert here — a banned DEPENDENCY belongs in a csproj/using check, not a word list; tracked with JNI removal.)",
+    "_note": "Manager is NT-canonical and allowed. Banned applies to OUR public type names in core components; SDK attribute types (CmdletProviderAttribute etc.) are foreign surface, not ours. Hosts (heads) are exempt entirely - the host IS the context, and Android-mandated names (Services/*Service, *Activity) live there. 'Endpoint' refused per CONTRACT.md section 4. 'Store' refused: invariant 1 is 'no second store' - the sin's name cannot be a blessed suffix; use Hive (Cm-canonical) for durable planes, Table/Record/Block for data structures. Existing core violations (Pp's IProvisioningHandler, Hb's AgentSessionStore) ride the ratchet baseline."
+  },
+
+  "platformNames": {
+    "_about": "SS011 collision guard: declaring a type with one of these names is an error UNLESS it inherits the platform base class it names (class X : Android.App.Service) or is allow-listed by namespace (types.shipped covers Ss.Vom's deliberate NT analogs - our Port IS the ALPC analog, by design).",
+    "aosp": ["Activity", "Service", "BroadcastReceiver", "ContentProvider", "Application",
+             "Fragment", "Intent", "IntentFilter", "PendingIntent", "Bundle", "Parcel", "Binder",
+             "Messenger", "Context", "ContextWrapper", "PackageManager", "View", "ViewGroup",
+             "SurfaceView", "TextureView", "WebView", "Layout", "Widget", "Canvas", "Paint",
+             "Drawable", "Bitmap", "Window", "Surface", "Handler", "Looper", "Message",
+             "MessageQueue", "ViewModel", "LiveData", "Lifecycle", "Configuration", "Resources",
+             "Manifest"],
+    "linux": ["kobject", "kset", "cdev", "inode", "dentry", "ops", "priv"],
+    "ntReserved": ["Process", "Thread", "Token", "File", "Section", "Event", "Mutant",
+                   "Semaphore", "Timer", "Driver", "Device", "Adapter", "Port"]
+  },
+
+  "paths": {
+    "_about": "SS004/SS014 vocabulary. Roots migrated from SS004FabricatedPathAnalyzer.cs:29 (ratchet R10: the analyzer reads THIS file, not its own list). Segments are the starter set pending the census.",
+    "roots": ["Capability", "Shell", "Device", "Sessions", "Agent", "System", "Diag", "Capture", "Object"],
+    "segments": ["Presenter", "Theme", "Config", "Settings", "Model", "Card", "AgentTool",
+                 "Consent", "Remoting", "Engine", "Components", "Contract", "Policies", "Probe"]
+  },
+
+  "drivers": {
+    "_about": "Where the physical world enters - granted at construction, normally mounted at Root by a head.",
+    "registered": ["Clock", "DurablePlane", "LogSink"]
+  },
+
+  "hosts": {
+    "android": "src/runspace MainActivity + Services/ + Widgets/ (ship target)",
+    "windows": "src/runspace/windows (the interrogable head)"
+  }
+}

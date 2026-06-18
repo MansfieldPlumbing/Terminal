@@ -1,0 +1,60 @@
+/* TaskView — full-screen Start-with-tasks. Theme vars + the mica glass contract only. */
+
+.object-taskview .taskview[hidden] { display: none; }   /* the attr must beat display:flex below */
+.object-taskview .taskview {
+  position: fixed; inset: 0; z-index: 950;
+  display: flex; flex-direction: column;
+  background: rgba(var(--mica-rgb), calc(var(--mica-strong-opacity) * var(--transparency)));
+  backdrop-filter: blur(var(--mica-blur));
+  color: var(--fg); font-family: var(--font-sans);
+  padding: max(12px, env(safe-area-inset-top)) 14px max(12px, env(safe-area-inset-bottom)) 14px;
+  overflow-y: auto;
+}
+
+.object-taskview .taskview-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 4px 10px 4px;
+}
+.object-taskview .taskview-title {
+  font-size: 12px; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.object-taskview .taskview-apps-title { padding: 18px 4px 8px 4px; }
+.object-taskview .taskview-close {
+  background: transparent; border: 1px solid var(--border); color: var(--fg);
+  width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 14px;
+}
+.object-taskview .taskview-close:hover { border-color: var(--error); color: var(--error); }
+
+.object-taskview .taskview-tasks,
+.object-taskview .taskview-apps {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px;
+}
+
+.object-taskview .taskview-card {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 16px 8px 12px 8px; border-radius: 10px; cursor: pointer;
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+  border: 1px solid var(--border);
+  transition: background 0.15s, border-color 0.15s;
+}
+.object-taskview .taskview-card:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.object-taskview .taskview-card-icon {
+  font-family: var(--font-mono);   /* NF glyphs from the registry record — no icon library */
+  font-size: 26px; color: var(--accent); line-height: 1;
+}
+.object-taskview .taskview-card-label {
+  font-size: 12px; text-align: center; max-width: 100%;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.object-taskview .taskview-card-x {
+  position: absolute; top: 4px; right: 4px;
+  background: transparent; border: none; color: var(--muted);
+  font-size: 11px; cursor: pointer; padding: 4px; border-radius: 6px;
+}
+.object-taskview .taskview-card-x:hover { color: var(--error); }
