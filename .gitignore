@@ -1,0 +1,44 @@
+# Build outputs
+
+bin/
+obj/
+/build/
+
+# Local .NET / Android tooling
+
+/.dotnet/
+/.dotnet-p7/
+/.dotnet-cli/
+/.qnn-*/
+/.vs/
+/.vscode/
+
+# Downloaded/runtime investigation state
+
+*.nupkg
+*.nupkg.zip
+/android-coreclr-host-arm/
+/runtime-android-arm/
+/apk-inspect/
+
+# Device / experiment output
+
+/.device-tests/
+/.Wip/**/artifacts/
+/.Wip/**/receipts/
+
+# Android signing
+
+*.keystore
+*.jks
+*.idsig
+
+# Temporary files
+
+*.log
+*.tmp
+
+# OS junk
+
+Thumbs.db
+.DS_Store
