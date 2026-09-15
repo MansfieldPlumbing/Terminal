@@ -723,8 +723,11 @@ if ($null -eq $activeMvidBytes -or $activeMvidBytes.Length -ne 16) {
     throw "Failed to extract MVID from $terminalDll"
 }
 
-# Base libxamarin-app.so from reference build
-$origXamarinAppPath = Join-Path $referenceExtractDir "lib\$androidAbi\libxamarin-app.so"
+# Base libxamarin-app.so from repo scaffolding
+$origXamarinAppPath = Join-Path $PSScriptRoot "lib\scaffolding\$androidAbi\libxamarin-app.so"
+if (-not (Test-Path $origXamarinAppPath)) {
+    throw "Base libxamarin-app.so not found for $androidAbi at $origXamarinAppPath"
+}
 $xamarinAppBytes = [System.IO.File]::ReadAllBytes($origXamarinAppPath)
 
 # ---------------------------------------------------------------------------
@@ -1377,6 +1380,11 @@ Write-Host "  Generated binary AndroidManifest.xml: $generatedAxmlHash ($($gener
 
 [System.IO.File]::WriteAllBytes($patchedXamarinAppPath, $xamarinAppBytes)
 
+# Open coreclr runtime package to read native .so files
+$coreClrPkgPath = $verifiedPackages[$coreClrRuntimePackage.Id]
+$coreClrZip = [System.IO.Compression.ZipFile]::OpenRead($coreClrPkgPath)
+$nativePrefix = "runtimes/$RuntimeIdentifier/native/"
+
 foreach ($relPath in $entryNames) {
     if ($relPath -eq "lib/$androidAbi/libassembly-store.so") {
         $rawBytes = [System.IO.File]::ReadAllBytes($generatedElfPath)
@@ -1386,9 +1394,22 @@ foreach ($relPath in $entryNames) {
         $rawBytes = [System.IO.File]::ReadAllBytes($generatedClassesDex)
     } elseif ($relPath -eq "AndroidManifest.xml") {
         $rawBytes = [System.IO.File]::ReadAllBytes($generatedAxmlPath)
+    } elseif ($relPath -eq "lib/$androidAbi/libpsl-native.so") {
+        $pslPath = Join-Path $PSScriptRoot "lib\libpsl\$androidAbi\libpsl-native.so"
+        $rawBytes = [System.IO.File]::ReadAllBytes($pslPath)
+    } elseif ($relPath -eq "lib/$androidAbi/libmonodroid.so") {
+        $monoPath = Join-Path $PSScriptRoot "lib\scaffolding\$androidAbi\libmonodroid.so"
+        $rawBytes = [System.IO.File]::ReadAllBytes($monoPath)
+    } elseif ($relPath.StartsWith("lib/$androidAbi/lib")) {
+        $leafName = Split-Path $relPath -Leaf
+        $entry = $coreClrZip.GetEntry("$nativePrefix$leafName")
+        if (-not $entry) { throw "Native library $leafName not found in $coreClrPkgPath" }
+        $ms = [System.IO.MemoryStream]::new()
+        $s = $entry.Open(); $s.CopyTo($ms); $s.Dispose()
+        $rawBytes = $ms.ToArray(); $ms.Dispose()
     } else {
-        $fullPath = Join-Path $referenceExtractDir ($relPath.Replace('/', '\'))
-        if (-not (Test-Path $fullPath)) { throw "Reference artifact missing: $fullPath" }
+        $fullPath = Join-Path $PSScriptRoot ($relPath.Replace('/', '\'))
+        if (-not (Test-Path $fullPath)) { throw "Repository artifact missing: $fullPath" }
         $rawBytes = [System.IO.File]::ReadAllBytes($fullPath)
     }
     $isStored = ($relPath -eq 'resources.arsc')
@@ -1399,6 +1420,7 @@ foreach ($relPath in $entryNames) {
         Align   = if ($isStored) { 4 } else { 0 }
     }
 }
+$coreClrZip.Dispose()
 
 $unsignedApk = Join-Path $apkOutput "$ApplicationId-Unsigned.apk"
 Write-ApkZip $unsignedApk $apkEntries
