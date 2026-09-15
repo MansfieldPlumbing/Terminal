@@ -199,92 +199,136 @@ foreach ($pkg in $packageManifest) {
 
 #region 04 — Encode Managed Assembly Payloads (XAZS Format)
 # Input:
-#   Emitted managed assembly (Dev.MansfieldPlumbing.Terminal.dll) + remaining 337 reference payloads
+#   Emitted managed assembly (Dev.MansfieldPlumbing.Terminal.dll) + verified NuGet runtime packages
 # Output:
-#   Payload directory populated with XAZS compressed binary blocks
+#   Payload directory populated with XAZS compressed binary blocks (<assemblyName>.bin)
 # Physical Contract:
 #   Offset 0x00..0x03 : 'XAZS' (0x58415A53)
-#   Offset 0x04..0x07 : uint32 descriptorIndex (150 for Dev.MansfieldPlumbing.Terminal.dll)
-#   Offset 0x08..0x0B : uint32 uncompressedLength (13,312 bytes)
+#   Offset 0x04..0x07 : uint32 descriptorIndex (0 for standalone payloads)
+#   Offset 0x08..0x0B : uint32 uncompressedLength
 #   Offset 0x0C..end  : Zstandard frame (Level 3 compression)
 Write-Host "04 — Encoding managed assembly payloads..."
 
 $payloadWorkDir = Join-Path $tempDir "payloads"
-# Always rebuild from scratch — stale payload files from prior runs silently satisfy
-# Region 05 lookups, making population changes invisible. Correctness requires a clean slate.
 if (Test-Path $payloadWorkDir) { Remove-Item $payloadWorkDir -Recurse -Force }
 New-Item -ItemType Directory -Path $payloadWorkDir -Force | Out-Null
 
-# 1. Populate upstream reference payloads
-# Excluded: Dev.MansfieldPlumbing.Terminal.dll (replaced by emitted build below)
-# Excluded: PackagingHost.dll (unclassified — must defend right to exist; excluded pending runtime verification)
-Get-ChildItem (Join-Path $referencePayloadDir "*.bin") | Where-Object {
-    $_.Name -notmatch 'Dev\.MansfieldPlumbing\.Terminal\.dll\.bin' -and
-    $_.Name -notmatch 'PackagingHost\.dll\.bin'
-} | ForEach-Object {
-    Copy-Item $_.FullName (Join-Path $payloadWorkDir $_.Name) -Force
-}
+$assemblyStagingDir = Join-Path $tempDir "assemblies"
+if (Test-Path $assemblyStagingDir) { Remove-Item $assemblyStagingDir -Recurse -Force }
+New-Item -ItemType Directory -Path $assemblyStagingDir -Force | Out-Null
 
-# 2. P/Invoke binding for Zstandard compression
-if (-not ([System.Management.Automation.PSTypeName]'ZstdEngine').Type) {
+# 1. Extract verified runtime assemblies
+# A. CoreCLR BCL assemblies
+$coreClrPkgPath = $verifiedPackages[$coreClrRuntimePackage.Id]
+$coreClrZip = [System.IO.Compression.ZipFile]::OpenRead($coreClrPkgPath)
+$coreClrLibPrefix = "runtimes/$RuntimeIdentifier/lib/net11.0/"
+foreach ($entry in $coreClrZip.Entries) {
+    if ($entry.FullName.StartsWith($coreClrLibPrefix, [StringComparison]::OrdinalIgnoreCase) -and $entry.FullName.EndsWith(".dll", [StringComparison]::OrdinalIgnoreCase)) {
+        $destPath = Join-Path $assemblyStagingDir $entry.Name
+        [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $destPath, $true)
+    }
+}
+$coreClrZip.Dispose()
+
+# B. Android Runtime assemblies
+$androidPkgPath = $verifiedPackages['Microsoft.Android.Runtime.37.android']
+$androidZip = [System.IO.Compression.ZipFile]::OpenRead($androidPkgPath)
+$androidLibPrefix = "runtimes/android/lib/net11.0/"
+foreach ($entry in $androidZip.Entries) {
+    if ($entry.FullName.StartsWith($androidLibPrefix, [StringComparison]::OrdinalIgnoreCase) -and $entry.FullName.EndsWith(".dll", [StringComparison]::OrdinalIgnoreCase)) {
+        $destPath = Join-Path $assemblyStagingDir $entry.Name
+        [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $destPath, $true)
+    }
+}
+$androidZip.Dispose()
+
+# C. System.Management.Automation assembly
+$smaPkgPath = $verifiedPackages['System.Management.Automation']
+$smaZip = [System.IO.Compression.ZipFile]::OpenRead($smaPkgPath)
+$smaEntry = $smaZip.GetEntry("runtimes/unix/lib/net11.0/System.Management.Automation.dll")
+if (-not $smaEntry) { throw "Missing System.Management.Automation.dll in package $smaPkgPath" }
+$smaDest = Join-Path $assemblyStagingDir "System.Management.Automation.dll"
+[System.IO.Compression.ZipFileExtensions]::ExtractToFile($smaEntry, $smaDest, $true)
+$smaZip.Dispose()
+
+# D. Authored emitted Terminal assembly
+Copy-Item $terminalDll (Join-Path $assemblyStagingDir "Dev.MansfieldPlumbing.Terminal.dll") -Force
+
+$stagedAssemblies = Get-ChildItem -Path $assemblyStagingDir -Filter "*.dll"
+Write-Host "  Extracted $($stagedAssemblies.Count) managed assemblies to stage."
+
+# 2. Reflection.Emit P/Invoke binding for Zstandard compression (Zero Roslyn / Zero C#)
+if (-not ([System.Management.Automation.PSTypeName]'ZstdDynamicEngine').Type) {
     $zstdEnvironmentCandidate = $env:ZSTD_LIBRARY
     $ZstdLibraryPath = Resolve-BuildExecutable -ExplicitPath $ZstdLibraryPath `
         -DisplayName 'Zstandard native library' -CommandName @('libzstd.dll') `
         -CandidatePath @($zstdEnvironmentCandidate)
-    $escapedZstdLibraryPath = $ZstdLibraryPath.Replace('"', '""')
-    $csharp = @"
-using System;
-using System.Runtime.InteropServices;
 
-public static class ZstdEngine
-{
-    private const string LibName = @"$escapedZstdLibraryPath";
+    $tb = [System.Reflection.Emit.AssemblyBuilder]::DefineDynamicAssembly(
+        [System.Reflection.AssemblyName]::new("ZstdDynamicAssembly"),
+        [System.Reflection.Emit.AssemblyBuilderAccess]::Run
+    ).DefineDynamicModule("ZstdDynamicModule").DefineType("ZstdDynamicEngine", [System.Reflection.TypeAttributes]::Public)
 
-    [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern UIntPtr ZSTD_compress(byte[] dst, UIntPtr dstCapacity, byte[] src, UIntPtr srcSize, int compressionLevel);
+    $mbBound = $tb.DefinePInvokeMethod("ZSTD_compressBound", $ZstdLibraryPath,
+        [System.Reflection.MethodAttributes]::Public -bor [System.Reflection.MethodAttributes]::Static,
+        [System.Reflection.CallingConventions]::Standard,
+        [UIntPtr], @([UIntPtr]),
+        [System.Runtime.InteropServices.CallingConvention]::Cdecl,
+        [System.Runtime.InteropServices.CharSet]::Ansi)
+    $mbBound.SetImplementationFlags($mbBound.GetMethodImplementationFlags() -bor [System.Reflection.MethodImplAttributes]::PreserveSig)
 
-    [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern UIntPtr ZSTD_compressBound(UIntPtr srcSize);
+    $mbCompress = $tb.DefinePInvokeMethod("ZSTD_compress", $ZstdLibraryPath,
+        [System.Reflection.MethodAttributes]::Public -bor [System.Reflection.MethodAttributes]::Static,
+        [System.Reflection.CallingConventions]::Standard,
+        [UIntPtr], @([byte[]], [UIntPtr], [byte[]], [UIntPtr], [int]),
+        [System.Runtime.InteropServices.CallingConvention]::Cdecl,
+        [System.Runtime.InteropServices.CharSet]::Ansi)
+    $mbCompress.SetImplementationFlags($mbCompress.GetMethodImplementationFlags() -bor [System.Reflection.MethodImplAttributes]::PreserveSig)
 
-    [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern uint ZSTD_isError(UIntPtr code);
+    $mbIsError = $tb.DefinePInvokeMethod("ZSTD_isError", $ZstdLibraryPath,
+        [System.Reflection.MethodAttributes]::Public -bor [System.Reflection.MethodAttributes]::Static,
+        [System.Reflection.CallingConventions]::Standard,
+        [uint32], @([UIntPtr]),
+        [System.Runtime.InteropServices.CallingConvention]::Cdecl,
+        [System.Runtime.InteropServices.CharSet]::Ansi)
+    $mbIsError.SetImplementationFlags($mbIsError.GetMethodImplementationFlags() -bor [System.Reflection.MethodImplAttributes]::PreserveSig)
 
-    [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern IntPtr ZSTD_getErrorName(UIntPtr code);
-}
-"@
-    Add-Type -TypeDefinition $csharp
-}
-
-# 3. Compress newly emitted Dev.MansfieldPlumbing.Terminal.dll into payload_336_Dev.MansfieldPlumbing.Terminal.dll.bin
-$rawAssemblyBytes = [System.IO.File]::ReadAllBytes($terminalDll)
-$uncompressedSize = [uint32]$rawAssemblyBytes.Length
-
-$bound = [ulong][ZstdEngine]::ZSTD_compressBound([UIntPtr]$uncompressedSize)
-$compBuf = New-Object byte[] $bound
-$compSize = [ZstdEngine]::ZSTD_compress($compBuf, [UIntPtr]$bound, $rawAssemblyBytes, [UIntPtr]$uncompressedSize, 3)
-
-if ([ZstdEngine]::ZSTD_isError($compSize) -ne 0) {
-    $errPtr = [ZstdEngine]::ZSTD_getErrorName($compSize)
-    $errMsg = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi($errPtr)
-    throw "Zstandard compression failed: $errMsg"
+    $script:ZstdEngineType = $tb.CreateType()
 }
 
-$frameLen = [int][ulong]$compSize
-$smaPayloadBytes = New-Object byte[] (12 + $frameLen)
+$fnCompressBound = $script:ZstdEngineType.GetMethod("ZSTD_compressBound")
+$fnCompress      = $script:ZstdEngineType.GetMethod("ZSTD_compress")
+$fnIsError       = $script:ZstdEngineType.GetMethod("ZSTD_isError")
 
-# Header: 'XAZS' (0x58, 0x41, 0x5A, 0x53)
-$smaPayloadBytes[0] = 0x58
-$smaPayloadBytes[1] = 0x41
-$smaPayloadBytes[2] = 0x5A
-$smaPayloadBytes[3] = 0x53
-[System.BitConverter]::GetBytes([uint32]150).CopyTo($smaPayloadBytes, 4)
-[System.BitConverter]::GetBytes($uncompressedSize).CopyTo($smaPayloadBytes, 8)
-[System.Buffer]::BlockCopy($compBuf, 0, $smaPayloadBytes, 12, $frameLen)
+# 3. Compress each staged assembly into an XAZS payload
+$headerMagic = [byte[]]@(0x58, 0x41, 0x5A, 0x53) # 'XAZS'
 
-$smaPayloadFile = Join-Path $payloadWorkDir "payload_336_Dev.MansfieldPlumbing.Terminal.dll.bin"
-[System.IO.File]::WriteAllBytes($smaPayloadFile, $smaPayloadBytes)
-Write-Host "  Encoded Dev.MansfieldPlumbing.Terminal.dll -> payload_336 ($($smaPayloadBytes.Length) bytes, uncompressed=$uncompressedSize)"
+foreach ($asmItem in $stagedAssemblies) {
+    [byte[]]$rawAssemblyBytes = [System.IO.File]::ReadAllBytes($asmItem.FullName)
+    $uncompressedSize = [uint32]$rawAssemblyBytes.Length
+
+    $bound = [ulong]$fnCompressBound.Invoke($null, @([UIntPtr]$uncompressedSize))
+    [byte[]]$compBuf = New-Object byte[] $bound
+    $compSize = [ulong]$fnCompress.Invoke($null, [object[]]@($compBuf, [UIntPtr]$bound, $rawAssemblyBytes, [UIntPtr]$uncompressedSize, 3))
+
+    if ([uint32]$fnIsError.Invoke($null, @([UIntPtr]$compSize)) -ne 0) {
+        throw "Zstandard compression failed for $($asmItem.Name)"
+    }
+
+    $frameLen = [int]$compSize
+    $payloadBytes = New-Object byte[] (12 + $frameLen)
+
+    # Header: 'XAZS' (4B) + DescriptorIndex (4B, 0) + UncompressedSize (4B) + Zstd frame
+    [System.Buffer]::BlockCopy($headerMagic, 0, $payloadBytes, 0, 4)
+    [System.BitConverter]::GetBytes([uint32]0).CopyTo($payloadBytes, 4)
+    [System.BitConverter]::GetBytes($uncompressedSize).CopyTo($payloadBytes, 8)
+    [System.Buffer]::BlockCopy($compBuf, 0, $payloadBytes, 12, $frameLen)
+
+    $payloadFile = Join-Path $payloadWorkDir "$($asmItem.Name).bin"
+    [System.IO.File]::WriteAllBytes($payloadFile, $payloadBytes)
+}
+
+Write-Host "  Encoded $($stagedAssemblies.Count) managed assembly payloads into $payloadWorkDir"
 #endregion
 
 #region 05 — Construct XABA Assembly Store
