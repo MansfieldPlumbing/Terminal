@@ -361,7 +361,7 @@ Write-Host "  Streamed and encoded $totalEncoded managed assembly payloads (zero
 #endregion
 
 #region 05 - Construct XABA Assembly Store
-# Materializes the .NET for Android CoreCLR assembly store (magic 'XABA', format 0x80010004).
+# Emits the .NET for Android CoreCLR assembly store (magic 'XABA', format 0x80010004).
 # Header (28B) -> Index Table (9B * 2N) -> Descriptors (28B * N) -> Pascal Names -> Payloads
 # Offsets and sizes are dynamically computed to support arbitrary payload lengths.
 # The store is constructed entirely from the declared managed assembly population,
@@ -525,13 +525,13 @@ if ($PSCmdlet.ShouldProcess($generatedXabaPath, "Serialize XABA assembly store b
 }
 #endregion
 
-#region 06 — Materialize XABA as ELF (llvm-mc + ld)
+#region 06 — Emit XABA as ELF (llvm-mc + ld)
 # Wraps raw XABA binary blob into an allocatable ELF shared library exporting _assembly_store symbol.
 # Section name MUST be exactly 'payload' (allocatable, 16KB aligned).
-Write-Host "06 — Materializing XABA as ELF libassembly-store.so..."
+Write-Host "06 — Emitting XABA as ELF libassembly-store.so..."
 $generatedElfPath = Join-Path $tempDir "libassembly-store.so"
 
-if ($PSCmdlet.ShouldProcess($generatedElfPath, "Materialize XABA as ELF shared library")) {
+if ($PSCmdlet.ShouldProcess($generatedElfPath, "Emit XABA as ELF shared library")) {
     $androidSdkPackRoot = Join-Path $DotnetRoot 'packs'
     $llvmMcCandidate = Find-FirstFile -Root $androidSdkPackRoot -Filter 'llvm-mc.exe' `
         -Description 'Android workload llvm-mc executable'
@@ -571,10 +571,10 @@ if ($PSCmdlet.ShouldProcess($generatedElfPath, "Materialize XABA as ELF shared l
 
     Remove-Item $asmSource, $asmObj -ErrorAction SilentlyContinue
     if (-not (Test-Path $generatedElfPath)) {
-        throw "Materialized ELF not found: $generatedElfPath"
+        throw "Emitted ELF not found: $generatedElfPath"
     }
     $elfHash = (Get-FileHash $generatedElfPath -Algorithm SHA256).Hash
-    Write-Host "  ELF libassembly-store.so materialized: $elfHash ($((Get-Item $generatedElfPath).Length) bytes)"
+    Write-Host "  ELF libassembly-store.so emitted: $elfHash ($((Get-Item $generatedElfPath).Length) bytes)"
 }
 #endregion
 
