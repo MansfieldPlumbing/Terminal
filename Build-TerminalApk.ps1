@@ -213,56 +213,16 @@ $payloadWorkDir = Join-Path $tempDir "payloads"
 if (Test-Path $payloadWorkDir) { Remove-Item $payloadWorkDir -Recurse -Force }
 New-Item -ItemType Directory -Path $payloadWorkDir -Force | Out-Null
 
-$assemblyStagingDir = Join-Path $tempDir "assemblies"
-if (Test-Path $assemblyStagingDir) { Remove-Item $assemblyStagingDir -Recurse -Force }
-New-Item -ItemType Directory -Path $assemblyStagingDir -Force | Out-Null
-
-# 1. Extract verified runtime assemblies
-# A. CoreCLR BCL assemblies
-$coreClrPkgPath = $verifiedPackages[$coreClrRuntimePackage.Id]
-$coreClrZip = [System.IO.Compression.ZipFile]::OpenRead($coreClrPkgPath)
-$coreClrLibPrefix = "runtimes/$RuntimeIdentifier/lib/net11.0/"
-foreach ($entry in $coreClrZip.Entries) {
-    if ($entry.FullName.StartsWith($coreClrLibPrefix, [StringComparison]::OrdinalIgnoreCase) -and $entry.FullName.EndsWith(".dll", [StringComparison]::OrdinalIgnoreCase)) {
-        $destPath = Join-Path $assemblyStagingDir $entry.Name
-        [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $destPath, $true)
-    }
-}
-$coreClrZip.Dispose()
-
-# B. Android Runtime assemblies
-$androidPkgPath = $verifiedPackages['Microsoft.Android.Runtime.37.android']
-$androidZip = [System.IO.Compression.ZipFile]::OpenRead($androidPkgPath)
-$androidLibPrefix = "runtimes/android/lib/net11.0/"
-foreach ($entry in $androidZip.Entries) {
-    if ($entry.FullName.StartsWith($androidLibPrefix, [StringComparison]::OrdinalIgnoreCase) -and $entry.FullName.EndsWith(".dll", [StringComparison]::OrdinalIgnoreCase)) {
-        $destPath = Join-Path $assemblyStagingDir $entry.Name
-        [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $destPath, $true)
-    }
-}
-$androidZip.Dispose()
-
-# C. System.Management.Automation assembly
-$smaPkgPath = $verifiedPackages['System.Management.Automation']
-$smaZip = [System.IO.Compression.ZipFile]::OpenRead($smaPkgPath)
-$smaEntry = $smaZip.GetEntry("runtimes/unix/lib/net11.0/System.Management.Automation.dll")
-if (-not $smaEntry) { throw "Missing System.Management.Automation.dll in package $smaPkgPath" }
-$smaDest = Join-Path $assemblyStagingDir "System.Management.Automation.dll"
-[System.IO.Compression.ZipFileExtensions]::ExtractToFile($smaEntry, $smaDest, $true)
-$smaZip.Dispose()
-
-# D. Authored emitted Terminal assembly
-Copy-Item $terminalDll (Join-Path $assemblyStagingDir "Dev.MansfieldPlumbing.Terminal.dll") -Force
-
-$stagedAssemblies = Get-ChildItem -Path $assemblyStagingDir -Filter "*.dll"
-Write-Host "  Extracted $($stagedAssemblies.Count) managed assemblies to stage."
-
-# 2. Reflection.Emit P/Invoke binding for Zstandard compression (Zero Roslyn / Zero C#)
+# 1. Reflection.Emit P/Invoke binding for Zstandard compression (Zero Roslyn / Zero C#)
 if (-not ([System.Management.Automation.PSTypeName]'ZstdDynamicEngine').Type) {
-    $zstdEnvironmentCandidate = $env:ZSTD_LIBRARY
+    $zstdEnvironmentCandidate = @(
+        $env:ZSTD_LIBRARY,
+        'C:\Program Files\Git\mingw64\bin\libzstd.dll',
+        'C:\bin\libzstd.dll'
+    )
     $ZstdLibraryPath = Resolve-BuildExecutable -ExplicitPath $ZstdLibraryPath `
         -DisplayName 'Zstandard native library' -CommandName @('libzstd.dll') `
-        -CandidatePath @($zstdEnvironmentCandidate)
+        -CandidatePath $zstdEnvironmentCandidate
 
     $tb = [System.Reflection.Emit.AssemblyBuilder]::DefineDynamicAssembly(
         [System.Reflection.AssemblyName]::new("ZstdDynamicAssembly"),
@@ -300,19 +260,25 @@ $fnCompressBound = $script:ZstdEngineType.GetMethod("ZSTD_compressBound")
 $fnCompress      = $script:ZstdEngineType.GetMethod("ZSTD_compress")
 $fnIsError       = $script:ZstdEngineType.GetMethod("ZSTD_isError")
 
-# 3. Compress each staged assembly into an XAZS payload
 $headerMagic = [byte[]]@(0x58, 0x41, 0x5A, 0x53) # 'XAZS'
 
-foreach ($asmItem in $stagedAssemblies) {
-    [byte[]]$rawAssemblyBytes = [System.IO.File]::ReadAllBytes($asmItem.FullName)
-    $uncompressedSize = [uint32]$rawAssemblyBytes.Length
+$activeAssemblies = [System.Collections.Generic.List[object]]::new()
 
+function Compress-AssemblyPayload {
+    param(
+        [Parameter(Mandatory)]
+        [string]$AssemblyName,
+        [Parameter(Mandatory)]
+        [byte[]]$RawBytes
+    )
+
+    $uncompressedSize = [uint32]$RawBytes.Length
     $bound = [ulong]$fnCompressBound.Invoke($null, @([UIntPtr]$uncompressedSize))
     [byte[]]$compBuf = New-Object byte[] $bound
-    $compSize = [ulong]$fnCompress.Invoke($null, [object[]]@($compBuf, [UIntPtr]$bound, $rawAssemblyBytes, [UIntPtr]$uncompressedSize, 3))
+    $compSize = [ulong]$fnCompress.Invoke($null, [object[]]@($compBuf, [UIntPtr]$bound, $RawBytes, [UIntPtr]$uncompressedSize, 3))
 
     if ([uint32]$fnIsError.Invoke($null, @([UIntPtr]$compSize)) -ne 0) {
-        throw "Zstandard compression failed for $($asmItem.Name)"
+        throw "Zstandard compression failed for $AssemblyName"
     }
 
     $frameLen = [int]$compSize
@@ -324,20 +290,83 @@ foreach ($asmItem in $stagedAssemblies) {
     [System.BitConverter]::GetBytes($uncompressedSize).CopyTo($payloadBytes, 8)
     [System.Buffer]::BlockCopy($compBuf, 0, $payloadBytes, 12, $frameLen)
 
-    $payloadFile = Join-Path $payloadWorkDir "$($asmItem.Name).bin"
-    [System.IO.File]::WriteAllBytes($payloadFile, $payloadBytes)
+    $payloadFile = Join-Path $payloadWorkDir "$AssemblyName.bin"
+    if ($PSCmdlet.ShouldProcess($payloadFile, "Write XAZS compressed payload")) {
+        [System.IO.File]::WriteAllBytes($payloadFile, $payloadBytes)
+    }
+
+    $script:activeAssemblies.Add([PSCustomObject]@{
+        Name  = $AssemblyName
+        File  = $payloadFile
+        Bytes = $payloadBytes
+        Size  = [uint32]$payloadBytes.Length
+    })
 }
 
-Write-Host "  Encoded $($stagedAssemblies.Count) managed assembly payloads into $payloadWorkDir"
+if (-not (Test-Path $payloadWorkDir)) {
+    New-Item -ItemType Directory -Path $payloadWorkDir -Force -WhatIf:$false | Out-Null
+}
+
+$totalEncoded = 0
+
+# 2. Stream directly from packages into compression (Zero intermediate disk files)
+# A. CoreCLR BCL
+$coreClrPkgPath = $verifiedPackages[$coreClrRuntimePackage.Id]
+$coreClrZip = [System.IO.Compression.ZipFile]::OpenRead($coreClrPkgPath)
+$coreClrLibPrefix = "runtimes/$RuntimeIdentifier/lib/net11.0/"
+foreach ($entry in $coreClrZip.Entries) {
+    if ($entry.FullName.StartsWith($coreClrLibPrefix, [StringComparison]::OrdinalIgnoreCase) -and $entry.FullName.EndsWith(".dll", [StringComparison]::OrdinalIgnoreCase)) {
+        $ms = [System.IO.MemoryStream]::new()
+        $s = $entry.Open(); $s.CopyTo($ms); $s.Dispose()
+        Compress-AssemblyPayload -AssemblyName $entry.Name -RawBytes ($ms.ToArray())
+        $ms.Dispose()
+        $totalEncoded++
+    }
+}
+$coreClrZip.Dispose()
+
+# B. Android Runtime
+$androidPkgPath = $verifiedPackages['Microsoft.Android.Runtime.37.android']
+$androidZip = [System.IO.Compression.ZipFile]::OpenRead($androidPkgPath)
+$androidLibPrefix = "runtimes/android/lib/net11.0/"
+foreach ($entry in $androidZip.Entries) {
+    if ($entry.FullName.StartsWith($androidLibPrefix, [StringComparison]::OrdinalIgnoreCase) -and $entry.FullName.EndsWith(".dll", [StringComparison]::OrdinalIgnoreCase)) {
+        $ms = [System.IO.MemoryStream]::new()
+        $s = $entry.Open(); $s.CopyTo($ms); $s.Dispose()
+        Compress-AssemblyPayload -AssemblyName $entry.Name -RawBytes ($ms.ToArray())
+        $ms.Dispose()
+        $totalEncoded++
+    }
+}
+$androidZip.Dispose()
+
+# C. System.Management.Automation
+$smaPkgPath = $verifiedPackages['System.Management.Automation']
+$smaZip = [System.IO.Compression.ZipFile]::OpenRead($smaPkgPath)
+$smaEntry = $smaZip.GetEntry("runtimes/unix/lib/net11.0/System.Management.Automation.dll")
+if (-not $smaEntry) { throw "Missing System.Management.Automation.dll in package $smaPkgPath" }
+$ms = [System.IO.MemoryStream]::new()
+$s = $smaEntry.Open(); $s.CopyTo($ms); $s.Dispose()
+Compress-AssemblyPayload -AssemblyName "System.Management.Automation.dll" -RawBytes ($ms.ToArray())
+$ms.Dispose()
+$smaZip.Dispose()
+$totalEncoded++
+
+# D. Emitted Terminal assembly
+$termBytes = [System.IO.File]::ReadAllBytes($terminalDll)
+Compress-AssemblyPayload -AssemblyName "Dev.MansfieldPlumbing.Terminal.dll" -RawBytes $termBytes
+$totalEncoded++
+
+Write-Host "  Streamed and encoded $totalEncoded managed assembly payloads (zero intermediate disk staging)"
 #endregion
 
-#region 05 — Construct XABA Assembly Store
+#region 05 - Construct XABA Assembly Store
 # Materializes the .NET for Android CoreCLR assembly store (magic 'XABA', format 0x80010004).
 # Header (28B) -> Index Table (9B * 2N) -> Descriptors (28B * N) -> Pascal Names -> Payloads
 # Offsets and sizes are dynamically computed to support arbitrary payload lengths.
 # The store is constructed entirely from the declared managed assembly population,
 # with index hashes computed via IEEE 802.3 CRC32 in pure PowerShell.
-Write-Host "05 — Constructing XABA assembly store from declared population..."
+Write-Host "05 - Constructing XABA assembly store from declared population..."
 $generatedXabaPath = Join-Path $tempDir "assembly-store.generated.so"
 
 # 1. CRC32 lookup hash function (IEEE 802.3 polynomial 0xEDB88320)
@@ -358,26 +387,11 @@ function Compute-Crc([byte[]]$bytes) {
 }
 
 # 2. Derive active assembly population directly from staged payloads (zero reference-xaba.bin dependency)
-$payloadFiles = Get-ChildItem -Path $payloadWorkDir -Filter "*.bin" | Sort-Object Name
-if ($payloadFiles.Count -eq 0) {
-    throw "No payload files found in $payloadWorkDir. Run Region 04 first."
-}
-
-$activeAssemblies = [System.Collections.Generic.List[object]]::new()
-foreach ($f in $payloadFiles) {
-    $asmName = $f.BaseName # e.g. System.Management.Automation.dll
-    $activeAssemblies.Add([PSCustomObject]@{
-        Name = $asmName
-        File = $f.FullName
-        Size = [uint32]$f.Length
-    })
-}
-
 $N = $activeAssemblies.Count
 $descCount = 2 * $N
 $idxCount = 4 * $N
 $idxSize = $idxCount * 9
-$xabaVersion = [uint32]0x80010004
+$xabaVersion = [System.BitConverter]::ToUInt32([System.BitConverter]::GetBytes([int32]0x80010004), 0)
 $xabaStoreId = [uint64]1
 
 # 3. Build Descriptors and Names
@@ -515,50 +529,53 @@ if ($PSCmdlet.ShouldProcess($generatedXabaPath, "Serialize XABA assembly store b
 # Wraps raw XABA binary blob into an allocatable ELF shared library exporting _assembly_store symbol.
 # Section name MUST be exactly 'payload' (allocatable, 16KB aligned).
 Write-Host "06 — Materializing XABA as ELF libassembly-store.so..."
-$androidSdkPackRoot = Join-Path $DotnetRoot 'packs'
-$llvmMcCandidate = Find-FirstFile -Root $androidSdkPackRoot -Filter 'llvm-mc.exe' `
-    -Description 'Android workload llvm-mc executable'
-$linkerCandidate = Find-FirstFile -Root $androidSdkPackRoot -Filter 'ld.exe' `
-    -Description 'Android workload linker executable'
-$llvmMc = Resolve-BuildExecutable -ExplicitPath $LlvmMcPath -DisplayName 'llvm-mc' `
-    -CommandName @('llvm-mc.exe', 'llvm-mc') -CandidatePath @($llvmMcCandidate)
-$ld = Resolve-BuildExecutable -ExplicitPath $LinkerPath -DisplayName 'Android linker' `
-    -CommandName @('ld.exe', 'ld') -CandidatePath @($linkerCandidate)
-
 $generatedElfPath = Join-Path $tempDir "libassembly-store.so"
-$asmSource        = Join-Path $tempDir "assembly-store.S"
-$asmObj           = Join-Path $tempDir "assembly-store.o"
 
-# Forward slashes required for .incbin path
-$xabaEscaped = (Resolve-Path $generatedXabaPath).Path -replace '\\', '/'
+if ($PSCmdlet.ShouldProcess($generatedElfPath, "Materialize XABA as ELF shared library")) {
+    $androidSdkPackRoot = Join-Path $DotnetRoot 'packs'
+    $llvmMcCandidate = Find-FirstFile -Root $androidSdkPackRoot -Filter 'llvm-mc.exe' `
+        -Description 'Android workload llvm-mc executable'
+    $linkerCandidate = Find-FirstFile -Root $androidSdkPackRoot -Filter 'ld.exe' `
+        -Description 'Android workload linker executable'
+    $llvmMc = Resolve-BuildExecutable -ExplicitPath $LlvmMcPath -DisplayName 'llvm-mc' `
+        -CommandName @('llvm-mc.exe', 'llvm-mc') -CandidatePath @($llvmMcCandidate)
+    $ld = Resolve-BuildExecutable -ExplicitPath $LinkerPath -DisplayName 'Android linker' `
+        -CommandName @('ld.exe', 'ld') -CandidatePath @($linkerCandidate)
 
-$asmLines = @(
-    '.section payload, "a"',
-    '.balign 16384',
-    '.globl _assembly_store',
-    '_assembly_store:',
-    ('.incbin "' + $xabaEscaped + '"')
-)
-Set-Content -Path $asmSource -Value $asmLines -Encoding ASCII
+    $asmSource        = Join-Path $tempDir "assembly-store.S"
+    $asmObj           = Join-Path $tempDir "assembly-store.o"
 
-if ($androidAbi -eq 'arm64-v8a') {
-    & $llvmMc -triple=aarch64-linux-android -filetype=obj -o $asmObj $asmSource
-    if ($LASTEXITCODE -ne 0) { throw "llvm-mc failed with exit code $LASTEXITCODE" }
-    & $ld -m aarch64linux -shared -z noexecstack -z max-page-size=16384 --build-id=sha1 --export-dynamic-symbol=_assembly_store -o $generatedElfPath $asmObj
-    if ($LASTEXITCODE -ne 0) { throw "ld failed with exit code $LASTEXITCODE" }
-} else {
-    & $llvmMc -triple=armv7-linux-androideabi -filetype=obj -o $asmObj $asmSource
-    if ($LASTEXITCODE -ne 0) { throw "llvm-mc failed with exit code $LASTEXITCODE" }
-    & $ld -m armelf_linux_eabi -shared -z noexecstack -z max-page-size=4096 --build-id=sha1 --export-dynamic-symbol=_assembly_store -o $generatedElfPath $asmObj
-    if ($LASTEXITCODE -ne 0) { throw "ld failed with exit code $LASTEXITCODE" }
+    # Forward slashes required for .incbin path
+    $xabaEscaped = (Resolve-Path $generatedXabaPath).Path -replace '\\', '/'
+
+    $asmLines = @(
+        '.section payload, "a"',
+        '.balign 16384',
+        '.globl _assembly_store',
+        '_assembly_store:',
+        ('.incbin "' + $xabaEscaped + '"')
+    )
+    Set-Content -Path $asmSource -Value $asmLines -Encoding ASCII
+
+    if ($androidAbi -eq 'arm64-v8a') {
+        & $llvmMc -triple=aarch64-linux-android -filetype=obj -o $asmObj $asmSource
+        if ($LASTEXITCODE -ne 0) { throw "llvm-mc failed with exit code $LASTEXITCODE" }
+        & $ld -m aarch64linux -shared -z noexecstack -z max-page-size=16384 --build-id=sha1 --export-dynamic-symbol=_assembly_store -o $generatedElfPath $asmObj
+        if ($LASTEXITCODE -ne 0) { throw "ld failed with exit code $LASTEXITCODE" }
+    } else {
+        & $llvmMc -triple=armv7-linux-androideabi -filetype=obj -o $asmObj $asmSource
+        if ($LASTEXITCODE -ne 0) { throw "llvm-mc failed with exit code $LASTEXITCODE" }
+        & $ld -m armelf_linux_eabi -shared -z noexecstack -z max-page-size=4096 --build-id=sha1 --export-dynamic-symbol=_assembly_store -o $generatedElfPath $asmObj
+        if ($LASTEXITCODE -ne 0) { throw "ld failed with exit code $LASTEXITCODE" }
+    }
+
+    Remove-Item $asmSource, $asmObj -ErrorAction SilentlyContinue
+    if (-not (Test-Path $generatedElfPath)) {
+        throw "Materialized ELF not found: $generatedElfPath"
+    }
+    $elfHash = (Get-FileHash $generatedElfPath -Algorithm SHA256).Hash
+    Write-Host "  ELF libassembly-store.so materialized: $elfHash ($((Get-Item $generatedElfPath).Length) bytes)"
 }
-
-Remove-Item $asmSource, $asmObj -ErrorAction SilentlyContinue
-if (-not (Test-Path $generatedElfPath)) {
-    throw "Materialized ELF not found: $generatedElfPath"
-}
-$elfHash = (Get-FileHash $generatedElfPath -Algorithm SHA256).Hash
-Write-Host "  ELF libassembly-store.so materialized: $elfHash ($((Get-Item $generatedElfPath).Length) bytes)"
 #endregion
 
 #region 07 — Assemble APK (ZIP with 4-byte Stored Alignment)
