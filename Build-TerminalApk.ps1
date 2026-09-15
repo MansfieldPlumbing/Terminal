@@ -7,7 +7,7 @@ param(
     [ValidateSet('android-arm64', 'android-arm')]
     [string] $RuntimeIdentifier = 'android-arm',
 
-    [string] $ApplicationId = 'dev.mansfieldplumbing.androidsma',
+    [string] $ApplicationId = 'dev.mansfieldplumbing.terminal',
 
     [string] $JavaCompilerPath,
 
@@ -18,6 +18,10 @@ param(
     [string] $LinkerPath,
 
     [string] $ZstdLibraryPath,
+
+    [string] $SigningKeyPath,
+
+    [string] $SigningKeyPassword,
 
     [string] $AndroidSdkRoot,
 
@@ -93,7 +97,7 @@ function Find-FirstFile {
 #region 01 — Authored Assembly Emission
 # Emit the real AndroidSMA assembly from the authored PowerShell graph.
 $androidSmaDll = Join-Path $PSScriptRoot 'build\generated\AndroidSMA.dll'
-& (Join-Path $PSScriptRoot 'Scripts\Emit-AndroidSMA.ps1') -OutputPath $androidSmaDll
+& (Join-Path $PSScriptRoot 'scripts\Emit-AndroidSMA.ps1') -OutputPath $androidSmaDll
 if (-not [IO.File]::Exists($androidSmaDll)) {
     throw "AndroidSMA.dll was not emitted: $androidSmaDll"
 }
@@ -101,7 +105,7 @@ if (-not [IO.File]::Exists($androidSmaDll)) {
 
 #region 02 — Configuration & Path Topological Setup
 if ([string]::IsNullOrWhiteSpace($ApplicationId)) {
-    $ApplicationId = 'dev.mansfieldplumbing.androidsma'
+    $ApplicationId = 'dev.mansfieldplumbing.terminal'
 }
 $androidAbi = if ($RuntimeIdentifier -eq 'android-arm64') { 'arm64-v8a' } else { 'armeabi-v7a' }
 $debuggable = $Configuration -eq 'Debug'
@@ -1314,11 +1318,24 @@ function Write-LengthPrefixed([byte[]]$data) {
     return ,$res
 }
 
-$ksPath = [System.IO.Path]::Combine($env:LOCALAPPDATA, 'Xamarin', 'Mono for Android', 'debug.keystore')
-if (-not (Test-Path $ksPath)) {
-    throw "Debug keystore not found: $ksPath"
+$ksPath = if ($SigningKeyPath) {
+    [IO.Path]::GetFullPath($SigningKeyPath)
+} elseif ($env:TERMINAL_SIGNING_KEYSTORE) {
+    [IO.Path]::GetFullPath($env:TERMINAL_SIGNING_KEYSTORE)
+} else {
+    [System.IO.Path]::Combine($env:LOCALAPPDATA, 'Xamarin', 'Mono for Android', 'debug.keystore')
 }
-$cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($ksPath, 'android')
+if (-not (Test-Path $ksPath)) {
+    throw "Signing keystore not found: $ksPath"
+}
+$signingPassword = if ($SigningKeyPassword) {
+    $SigningKeyPassword
+} elseif ($env:TERMINAL_SIGNING_KEY_PASSWORD) {
+    $env:TERMINAL_SIGNING_KEY_PASSWORD
+} else {
+    'android'
+}
+$cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($ksPath, $signingPassword)
 $rsa  = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert)
 
 $signedApkPath = Join-Path $apkOutput "$ApplicationId-Signed.apk"

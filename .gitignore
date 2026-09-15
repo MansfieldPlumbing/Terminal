@@ -17,6 +17,7 @@ obj/
 
 *.nupkg
 *.nupkg.zip
+*.zip
 /android-coreclr-host-arm/
 /runtime-android-arm/
 /apk-inspect/
@@ -24,8 +25,6 @@ obj/
 # Device / experiment output
 
 /.device-tests/
-/.Wip/**/artifacts/
-/.Wip/**/receipts/
 
 # Android signing
 

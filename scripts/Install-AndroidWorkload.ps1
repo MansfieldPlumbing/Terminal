@@ -1,4 +1,4 @@
-﻿#Requires -Version 7.0
+#Requires -Version 7.0
 <#
 .SYNOPSIS
     Materializes the .NET Android workload directly from NuGet into the active global dotnet tree.
@@ -894,7 +894,7 @@ $Arm32AndroidHost = Join-Path $Arm32AndroidRoot 'runtimes\android-arm\native\lib
 
 if ('android-arm' -in $RuntimeIdentifiers) {
     Write-Host
-    Write-Host 'ARM32 CoreCLR receipts:'
+    Write-Host 'ARM32 CoreCLR verification results:'
     Get-Item -LiteralPath $Arm32CoreClr, $Arm32Jit, $Arm32NuGetCoreClr, $Arm32NuGetJit, $Arm32AndroidHost |
         Select-Object Name, Length, FullName |
         Format-Table -AutoSize

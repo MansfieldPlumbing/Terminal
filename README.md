@@ -36,10 +36,13 @@ FilesDir/
 ```
 
 If `Profile.ps1` is absent or fails, the Activity shows the source, line,
-column, source text, and message when available. The recovery screen imports any
-selected document into `FilesDir` under its display name. Importing
-`Profile.ps1` retries with a fresh runspace. Other files, including `config.ini`
-or `cat.jpg`, are available to the start script under `$PSScriptRoot`.
+column, source text, and message when available. The build intentionally
+packages no `Profile.ps1`; `FilesDir` is empty on a fresh install and the app
+opens on the recovery screen by design rather than because files are missing.
+The recovery screen imports any selected document into `FilesDir` under its
+display name. Importing `Profile.ps1` retries with a fresh runspace. Other files,
+including `config.ini` or `cat.jpg`, are available to the start script under
+`$PSScriptRoot`.
 
 The current Activity is available to the start script as `$Activity`. Android's
 global application context remains available directly as
@@ -49,13 +52,18 @@ directory as `$PSScriptRoot` before invoking the start-script source.
 ## Reproduce the toolchain
 
 Use a PowerShell host whose SMA and .NET versions match the Android runtime
-artifacts being packaged. Resolve it explicitly before running the commands:
+artifacts being packaged. Toolchain scripts should be executed using the
+repository-pinned PowerShell host (`pwsh` on `PATH` or configured via `PWSH`):
 
 ```powershell
-$PowerShellPath = (Get-Command pwsh -CommandType Application -ErrorAction SilentlyContinue |
-  Select-Object -First 1).Source
+$PowerShellPath = if ($env:PWSH -and (Test-Path -LiteralPath (Join-Path $env:PWSH 'pwsh.exe'))) {
+    Join-Path $env:PWSH 'pwsh.exe'
+} else {
+    (Get-Command pwsh -CommandType Application -ErrorAction SilentlyContinue |
+        Select-Object -First 1).Source
+}
 if (-not $PowerShellPath) {
-  throw 'PowerShell was not found. Install it or set $PowerShellPath explicitly.'
+    throw 'PowerShell was not found. Install it or set $PowerShellPath / $env:PWSH explicitly.'
 }
 ```
 
@@ -66,45 +74,41 @@ including `libcoreclr.so` and `libclrjit.so`.
 
 ```powershell
 & $PowerShellPath -NoProfile -ExecutionPolicy Bypass `
-  -File .\Scripts\Install-AndroidWorkload.ps1
+  -File .\scripts\Install-AndroidWorkload.ps1
 ```
 
 ## Build
-
-The current build machinery still carries several `AndroidSMA` identifiers from
-the donor project. These are implementation names being mechanically renamed to
-Terminal; they are not a second product.
 
 The current authored build entry point is:
 
 ```powershell
 & $PowerShellPath -NoProfile -ExecutionPolicy Bypass `
-  -File .\Build-AndroidSMA.ps1
+  -File .\Build-TerminalApk.ps1
 ```
 
 ARM32 CoreCLR:
 
 ```powershell
 & $PowerShellPath -NoProfile -ExecutionPolicy Bypass `
-  -File .\Build-AndroidSMA.ps1 -RuntimeIdentifier android-arm
+  -File .\Build-TerminalApk.ps1 -RuntimeIdentifier android-arm
 ```
 
 Both targets accept `-Configuration Debug`.
 
-`Build-AndroidSMA.ps1` accepts explicit `-JavaCompilerPath`, `-D8Path`,
-`-LlvmMcPath`, `-LinkerPath`, `-ZstdLibraryPath`, `-AndroidSdkRoot`, and
-`-DotnetRoot` values.
+`Build-TerminalApk.ps1` accepts explicit `-JavaCompilerPath`, `-D8Path`,
+`-LlvmMcPath`, `-LinkerPath`, `-ZstdLibraryPath`, `-SigningKeyPath`,
+`-SigningKeyPassword`, `-AndroidSdkRoot`, and `-DotnetRoot` values.
 Without them, it discovers executables from `PATH`, `JAVA_HOME`,
 `ANDROID_SDK_ROOT`/`ANDROID_HOME`, `DOTNET_ROOT`, and the active `dotnet`
 installation. A missing tool or root stops the build with a direct error.
+The signing password can optionally be supplied through
+`TERMINAL_SIGNING_KEY_PASSWORD`; output is debug-signed.
 
-The current package identifier is
-`dev.mansfieldplumbing.androidsma`; it will move with the remaining build
-identity during the Terminal rename.
+The package identifier is `dev.mansfieldplumbing.terminal`.
 
 The APK packages the PowerShell native compatibility shim as
-`libpsl-native.so`. Rebuild it with
-`Native/PowerShellShim/Source/Build-libpsl-native.ps1` when required.
+`libpsl-native.so` from `lib/libpsl/{arm64-v8a,armeabi-v7a}/libpsl-native.so`.
+Rebuild it with `src/libpsl/Build.ps1` when required.
 
 ## Lifetime
 

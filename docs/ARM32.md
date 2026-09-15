@@ -88,7 +88,7 @@ The local SDK directory and downloaded/extracted runtime packages are build tool
 
 The ARM32 `libpsl-android.so` compatibility shim was built with the Android NDK ARMv7 compiler (`armv7a-linux-androideabi34-clang`).
 
-The proven ARM32 shim receipt was:
+The proven ARM32 shim result was:
 
 ```text
 SHA-256
