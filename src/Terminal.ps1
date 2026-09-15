@@ -6,7 +6,7 @@ param(
     [Android.App.Activity] $Activity = $global:Activity
 )
 
-# AndroidSMA's terminal shell. The application remains PowerShell; Android owns
+# Terminal shell. The application remains PowerShell; Android owns
 # only input admission and presentation through the packed-cell canvas edge.
 enum TerminalPage { Terminal; Editor; Settings }
 
@@ -50,7 +50,7 @@ if ($null -eq $script:Cells) {
     $global:TerminalReflowRows = @()
     $global:TerminalSyntaxCache = @{}
     $global:TerminalTranscript.Add([pscustomobject]@{ Text = 'PowerShell 7 on Android CoreCLR'; Foreground = 10 })
-    $global:TerminalTranscript.Add([pscustomobject]@{ Text = 'AndroidSMA terminal ready.'; Foreground = 7 })
+    $global:TerminalTranscript.Add([pscustomobject]@{ Text = 'Terminal ready.'; Foreground = 7 })
     $global:TerminalTranscript.Add([pscustomobject]@{ Text = ''; Foreground = 7 })
     $global:TerminalCommand = $null
     $global:TerminalAsync = $null
@@ -61,7 +61,7 @@ if ($null -eq $script:Cells) {
     $global:TerminalQuickIndex = 0
     $global:TerminalQuickCommands = @(
         '$PSVersionTable',
-        '$global:AndroidSmaCount = 1 + $global:AndroidSmaCount; $global:AndroidSmaCount',
+        '$global:TerminalCount = 1 + $global:TerminalCount; $global:TerminalCount',
         '[Environment]::ProcessorCount',
         'Get-Process | Select-Object -First 8',
         '[DateTime]::Now'
@@ -102,7 +102,7 @@ function global:Add-TerminalLine([string] $Text, [int] $Foreground = 7) {
     $script:Dirty = $true
 }
 
-function global:Exit-AndroidSmaTerminal {
+function global:Exit-Terminal {
     if ($null -ne $script:AndroidCanvasEdge) {
         $script:AndroidCanvasEdge.Active = $false
         if ($null -ne $script:AndroidCanvasEdge.HintSession) {
@@ -116,13 +116,13 @@ function global:Exit-AndroidSmaTerminal {
     # A later launch creates a new terminal model and a new child runspace.
     $script:Cells = $null
     $startPath = [System.IO.Path]::Combine(
-        [string]$global:AndroidSMA.Home, 'Profile.ps1')
+        [string]$global:Terminal.Home, 'Profile.ps1')
     if (-not [System.IO.File]::Exists($startPath)) {
         throw "Profile.ps1 was not found: $startPath"
     }
     [System.Environment]::SetEnvironmentVariable(
-        'ANDROIDSMA_SESSION', 'launcher', [System.EnvironmentVariableTarget]::Process)
-    $global:AndroidSMA.Session = 'launcher'
+        'TERMINAL_SESSION', 'launcher', [System.EnvironmentVariableTarget]::Process)
+    $global:Terminal.Session = 'launcher'
     [scriptblock] $startSource = [scriptblock]::Create(
         [System.IO.File]::ReadAllText($startPath))
     & $startSource
@@ -136,7 +136,7 @@ function global:Start-TerminalCommand {
     if ($commandText.Trim().Equals('exit', [StringComparison]::OrdinalIgnoreCase)) {
         $global:TerminalInput = ''
         $global:TerminalInputCursor = 0
-        Exit-AndroidSmaTerminal
+        Exit-Terminal
         return
     }
     Add-TerminalLine "PS> $commandText" 11
@@ -833,7 +833,7 @@ function global:Invoke-AndroidCanvasFrame {
 
 $activity = $Activity
 if ($null -eq $activity) {
-    throw 'CanvasDemo.ps1 requires AndroidSMA to provide $Activity, or an Activity passed with -Activity.'
+    throw 'CanvasDemo.ps1 requires Terminal to provide $Activity, or an Activity passed with -Activity.'
 }
 $generation = [Guid]::NewGuid()
 $frequency = [double][Stopwatch]::Frequency
@@ -984,8 +984,8 @@ $edge.KeyPress = $keyPress
             "Canvas tick failed: $_ stack=$($_.ScriptStackTrace)")
     }
 }.GetNewClosure()
-[AndroidSMA.RecoveryProgram]::SetAnimationCallback($onAnimation)
-$callbackMethod = [AndroidSMA.RecoveryProgram].GetMethod(
+[Dev.MansfieldPlumbing.Terminal.RecoveryProgram]::SetAnimationCallback($onAnimation)
+$callbackMethod = [Dev.MansfieldPlumbing.Terminal.RecoveryProgram].GetMethod(
     'RunAnimationCallback',
     [Reflection.BindingFlags]'Public,Static')
 [Action] $animationCallback = $callbackMethod.CreateDelegate([Action])

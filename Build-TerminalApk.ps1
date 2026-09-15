@@ -95,11 +95,11 @@ function Find-FirstFile {
 }
 
 #region 01 — Authored Assembly Emission
-# Emit the real AndroidSMA assembly from the authored PowerShell graph.
-$androidSmaDll = Join-Path $PSScriptRoot 'build\generated\AndroidSMA.dll'
-& (Join-Path $PSScriptRoot 'scripts\Emit-AndroidSMA.ps1') -OutputPath $androidSmaDll
-if (-not [IO.File]::Exists($androidSmaDll)) {
-    throw "AndroidSMA.dll was not emitted: $androidSmaDll"
+# Emit the real Terminal assembly from the authored PowerShell graph.
+$terminalDll = Join-Path $PSScriptRoot 'build\generated\Dev.MansfieldPlumbing.Terminal.dll'
+& (Join-Path $PSScriptRoot 'scripts\Emit-Terminal.ps1') -OutputPath $terminalDll
+if (-not [IO.File]::Exists($terminalDll)) {
+    throw "Dev.MansfieldPlumbing.Terminal.dll was not emitted: $terminalDll"
 }
 #endregion
 
@@ -130,34 +130,34 @@ if (-not (Test-Path $tempDir)) {
 }
 #endregion
 
-#region 03 — Oracle Provenance Verification (Pinned Generation E85A25C3)
-# The build borrows proven shell artifacts from an immutable, byte-pinned oracle generation:
-# Oracle APK: E85A25C3A632FB0BB319769D1B19C3CBDAAA25A0B1406E752DC011F8883B3BF1
-# Oracle XABA: 3EC2CEF338CD39D5A8B9410052A73EF3E8C924C537DCA4BC2BAF0B95BF2BE741
-$oracleDir = Join-Path $PSScriptRoot "build\provenance\oracle-arm32-E85A25C3"
-if ($RuntimeIdentifier -ne 'android-arm' -or -not (Test-Path $oracleDir)) {
-    throw "Oracle provenance is currently pinned for android-arm at $oracleDir. Other architectures require pinned provenance."
+#region 03 — Reference Build Verification (Pinned Generation E85A25C3)
+# The build borrows proven shell artifacts from an immutable, byte-pinned reference generation:
+# Reference APK: E85A25C3A632FB0BB319769D1B19C3CBDAAA25A0B1406E752DC011F8883B3BF1
+# Reference XABA: 3EC2CEF338CD39D5A8B9410052A73EF3E8C924C537DCA4BC2BAF0B95BF2BE741
+$referenceDir = Join-Path $PSScriptRoot "build\reference\arm32-E85A25C3"
+if ($RuntimeIdentifier -ne 'android-arm' -or -not (Test-Path $referenceDir)) {
+    throw "Reference build is currently pinned for android-arm at $referenceDir. Other architectures require pinned reference build."
 }
 
-$oracleXabaPath   = Join-Path $oracleDir "oracle-xaba.bin"
-$oraclePayloadDir = Join-Path $oracleDir "payloads"
-$oracleExtractDir = Join-Path $oracleDir "extracted"
+$referenceXabaPath   = Join-Path $referenceDir "reference-xaba.bin"
+$referencePayloadDir = Join-Path $referenceDir "payloads"
+$referenceExtractDir = Join-Path $referenceDir "extracted"
 
 $expectedXabaHash = "3EC2CEF338CD39D5A8B9410052A73EF3E8C924C537DCA4BC2BAF0B95BF2BE741"
-$actualXabaHash   = (Get-FileHash $oracleXabaPath -Algorithm SHA256).Hash
+$actualXabaHash   = (Get-FileHash $referenceXabaPath -Algorithm SHA256).Hash
 if ($actualXabaHash -ne $expectedXabaHash) {
-    throw "Oracle XABA hash mismatch!`n  Expected: $expectedXabaHash`n  Got:      $actualXabaHash"
+    throw "Reference XABA hash mismatch!`n  Expected: $expectedXabaHash`n  Got:      $actualXabaHash"
 }
 #endregion
 
 #region 04 — Encode Managed Assembly Payloads (XAZS Format)
 # Input:
-#   Emitted managed assembly (AndroidSMA.dll) + remaining 337 oracle payloads
+#   Emitted managed assembly (Dev.MansfieldPlumbing.Terminal.dll) + remaining 337 reference payloads
 # Output:
 #   Payload directory populated with XAZS compressed binary blocks
 # Physical Contract:
 #   Offset 0x00..0x03 : 'XAZS' (0x58415A53)
-#   Offset 0x04..0x07 : uint32 descriptorIndex (150 for AndroidSMA.dll)
+#   Offset 0x04..0x07 : uint32 descriptorIndex (150 for Dev.MansfieldPlumbing.Terminal.dll)
 #   Offset 0x08..0x0B : uint32 uncompressedLength (13,312 bytes)
 #   Offset 0x0C..end  : Zstandard frame (Level 3 compression)
 Write-Host "04 — Encoding managed assembly payloads..."
@@ -168,10 +168,10 @@ $payloadWorkDir = Join-Path $tempDir "payloads"
 if (Test-Path $payloadWorkDir) { Remove-Item $payloadWorkDir -Recurse -Force }
 New-Item -ItemType Directory -Path $payloadWorkDir -Force | Out-Null
 
-# 1. Populate upstream oracle payloads
-# Excluded: AndroidSMA.dll (replaced by emitted build below)
-# Excluded: AndroidSMA.PackagingHost.dll (unclassified — must defend right to exist; excluded pending runtime verification)
-Get-ChildItem (Join-Path $oraclePayloadDir "*.bin") | Where-Object {
+# 1. Populate upstream reference payloads
+# Excluded: Dev.MansfieldPlumbing.Terminal.dll (replaced by emitted build below)
+# Excluded: PackagingHost.dll (unclassified — must defend right to exist; excluded pending runtime verification)
+Get-ChildItem (Join-Path $referencePayloadDir "*.bin") | Where-Object {
     $_.Name -notmatch 'AndroidSMA\.dll\.bin' -and
     $_.Name -notmatch 'AndroidSMA\.PackagingHost\.dll\.bin'
 } | ForEach-Object {
@@ -209,8 +209,8 @@ public static class ZstdEngine
     Add-Type -TypeDefinition $csharp
 }
 
-# 3. Compress newly emitted AndroidSMA.dll into payload_336_AndroidSMA.dll.bin
-$rawAssemblyBytes = [System.IO.File]::ReadAllBytes($androidSmaDll)
+# 3. Compress newly emitted Dev.MansfieldPlumbing.Terminal.dll into payload_336_Dev.MansfieldPlumbing.Terminal.dll.bin
+$rawAssemblyBytes = [System.IO.File]::ReadAllBytes($terminalDll)
 $uncompressedSize = [uint32]$rawAssemblyBytes.Length
 
 $bound = [ulong][ZstdEngine]::ZSTD_compressBound([UIntPtr]$uncompressedSize)
@@ -235,9 +235,9 @@ $smaPayloadBytes[3] = 0x53
 [System.BitConverter]::GetBytes($uncompressedSize).CopyTo($smaPayloadBytes, 8)
 [System.Buffer]::BlockCopy($compBuf, 0, $smaPayloadBytes, 12, $frameLen)
 
-$smaPayloadFile = Join-Path $payloadWorkDir "payload_336_AndroidSMA.dll.bin"
+$smaPayloadFile = Join-Path $payloadWorkDir "payload_336_Dev.MansfieldPlumbing.Terminal.dll.bin"
 [System.IO.File]::WriteAllBytes($smaPayloadFile, $smaPayloadBytes)
-Write-Host "  Encoded AndroidSMA.dll -> payload_336 ($($smaPayloadBytes.Length) bytes, uncompressed=$uncompressedSize)"
+Write-Host "  Encoded Dev.MansfieldPlumbing.Terminal.dll -> payload_336 ($($smaPayloadBytes.Length) bytes, uncompressed=$uncompressedSize)"
 #endregion
 
 #region 05 — Construct XABA Assembly Store
@@ -266,27 +266,27 @@ function Compute-Crc([byte[]]$bytes) {
     return [uint32]($crc -bxor [uint32]::MaxValue)
 }
 
-# 2. Canonical assembly names from oracle, filtering unproven assemblies
-$fsIn = [System.IO.File]::OpenRead($oracleXabaPath)
+# 2. Canonical assembly names from reference, filtering unproven assemblies
+$fsIn = [System.IO.File]::OpenRead($referenceXabaPath)
 $brIn = [System.IO.BinaryReader]::new($fsIn)
-$oracleMagic      = $brIn.ReadBytes(4)
-$oracleVersion    = $brIn.ReadUInt32()
-$oracleEntryCount = $brIn.ReadUInt32()
-$oracleIndexEntryCount = $brIn.ReadUInt32()
-$oracleIndexSize  = $brIn.ReadUInt32()
-$oracleStoreId    = $brIn.ReadUInt64()
-$brIn.ReadBytes($oracleIndexSize + (28 * $oracleEntryCount)) | Out-Null
-$oracleNames = for ($i = 0; $i -lt $oracleEntryCount; $i++) {
+$referenceMagic      = $brIn.ReadBytes(4)
+$referenceVersion    = $brIn.ReadUInt32()
+$referenceEntryCount = $brIn.ReadUInt32()
+$referenceIndexEntryCount = $brIn.ReadUInt32()
+$referenceIndexSize  = $brIn.ReadUInt32()
+$referenceStoreId    = $brIn.ReadUInt64()
+$brIn.ReadBytes($referenceIndexSize + (28 * $referenceEntryCount)) | Out-Null
+$referenceNames = for ($i = 0; $i -lt $referenceEntryCount; $i++) {
     $len = $brIn.ReadUInt32()
     [System.Text.Encoding]::UTF8.GetString($brIn.ReadBytes($len))
 }
 $fsIn.Close()
 
-# Active assemblies (even indices in oracle pairing), excluding AndroidSMA.PackagingHost.dll
+# Active assemblies (even indices in reference pairing), excluding PackagingHost.dll
 $activeAssemblies = [System.Collections.Generic.List[object]]::new()
-for ($i = 0; $i -lt $oracleEntryCount; $i += 2) {
-    $name = $oracleNames[$i]
-    if ($name -eq 'AndroidSMA.PackagingHost.dll') {
+for ($i = 0; $i -lt $referenceEntryCount; $i += 2) {
+    $name = $referenceNames[$i]
+    if ($name -match 'PackagingHost\.dll$') {
         Write-Host "  Excluding unproven assembly from XABA population: $name"
         continue
     }
@@ -386,11 +386,11 @@ $bwOut = [System.IO.BinaryWriter]::new($fsOut)
 
 # Header
 $bwOut.Write([byte[]]@(0x58, 0x41, 0x42, 0x41)) # 'XABA'
-$bwOut.Write([uint32]$oracleVersion)
+$bwOut.Write([uint32]$referenceVersion)
 $bwOut.Write([uint32]$descCount)
 $bwOut.Write([uint32]$idxCount)
 $bwOut.Write([uint32]$idxSize)
-$bwOut.Write([uint64]$oracleStoreId)
+$bwOut.Write([uint64]$referenceStoreId)
 
 # Index Table
 foreach ($e in $sortedIndex) {
@@ -572,7 +572,7 @@ $entryNames = @(
     "lib/$androidAbi/libmonodroid.so",
     "lib/$androidAbi/libpsl-native.so",
     "lib/$androidAbi/libxamarin-app.so",
-    'res/drawable/androidsma_banner.xml',
+    'res/drawable/terminal_banner.xml',
     'res/xml/splits0.xml',
     'resources.arsc'
 )
@@ -580,9 +580,9 @@ $entryNames = @(
 $apkEntries = @()
 $patchedXamarinAppPath = Join-Path $tempDir "libxamarin-app.so"
 
-# Synthesize application-specific typemap record for AndroidSMA.dll into libxamarin-app.so
-# Extract active MVID directly from emitted AndroidSMA.dll metadata
-$smaRaw = [System.IO.File]::ReadAllBytes($androidSmaDll)
+# Synthesize application-specific typemap record for Dev.MansfieldPlumbing.Terminal.dll into libxamarin-app.so
+# Extract active MVID directly from emitted Dev.MansfieldPlumbing.Terminal.dll metadata
+$smaRaw = [System.IO.File]::ReadAllBytes($terminalDll)
 $peOff = [System.BitConverter]::ToInt32($smaRaw, 0x3C)
 $cliRva = [System.BitConverter]::ToInt32($smaRaw, $peOff + 24 + 208)
 $numSec = [System.BitConverter]::ToInt16($smaRaw, $peOff + 6)
@@ -624,11 +624,11 @@ for ($i = 0; $i -lt $numSec; $i++) {
 }
 
 if ($null -eq $activeMvidBytes -or $activeMvidBytes.Length -ne 16) {
-    throw "Failed to extract MVID from $androidSmaDll"
+    throw "Failed to extract MVID from $terminalDll"
 }
 
-# Base libxamarin-app.so from oracle provenance
-$origXamarinAppPath = Join-Path $oracleExtractDir "lib\$androidAbi\libxamarin-app.so"
+# Base libxamarin-app.so from reference build
+$origXamarinAppPath = Join-Path $referenceExtractDir "lib\$androidAbi\libxamarin-app.so"
 $xamarinAppBytes = [System.IO.File]::ReadAllBytes($origXamarinAppPath)
 
 # ---------------------------------------------------------------------------
@@ -642,14 +642,14 @@ $xamarinAppBytes = [System.IO.File]::ReadAllBytes($origXamarinAppPath)
 # completely unrelated modules.
 #
 # Correct algorithm:
-#   1. Read all three TypeMapModule records from the oracle binary.
+#   1. Read all three TypeMapModule records from the reference binary.
 #   2. Replace AndroidSMA's uuid with the freshly emitted MVID.
 #   3. Sort all records ascending by raw uuid bytes (memcmp order).
 #   4. Build an old-index → new-index remap table.
 #   5. Walk every TypeMapJava entry and remap its module_index field.
 #   6. Write the sorted modules and updated TypeMapJava table back.
 #
-# Structural constants (verified by binary inspection of oracle ELF):
+# Structural constants (verified by binary inspection of reference ELF):
 #   managed_to_java_map  file offset 1039924  3 modules × 40 bytes each
 #   TypeMapModule layout (40 bytes):
 #       [0..15]  module_uuid       (16 bytes)
@@ -683,21 +683,21 @@ for ($m = 0; $m -lt $moduleCount; $m++) {
     $moduleRecords += ,$rec
 }
 
-# Identify which record is AndroidSMA by matching known oracle uuid
-# Oracle AndroidSMA uuid (hex): 75 98 A9 08 00 BC 2D 40 94 2E D2 42 78 33 58 06
+# Identify which record is Terminal by matching known reference uuid
+# Reference Terminal uuid (hex): 75 98 A9 08 00 BC 2D 40 94 2E D2 42 78 33 58 06
 # (= GUID 08a99875-bc00-402d-942e-d24278335806 in little-endian storage)
 # Replace that record's uuid with the freshly emitted MVID
-$oracleAndroidSmaUuid = [byte[]](0x75,0x98,0xA9,0x08,0x00,0xBC,0x2D,0x40,0x94,0x2E,0xD2,0x42,0x78,0x33,0x58,0x06)
+$referenceTerminalUuid = [byte[]](0x75,0x98,0xA9,0x08,0x00,0xBC,0x2D,0x40,0x94,0x2E,0xD2,0x42,0x78,0x33,0x58,0x06)
 $smaModuleOldIndex = -1
 for ($m = 0; $m -lt $moduleCount; $m++) {
     $match = $true
     for ($b = 0; $b -lt 16; $b++) {
-        if ($moduleRecords[$m][$b] -ne $oracleAndroidSmaUuid[$b]) { $match = $false; break }
+        if ($moduleRecords[$m][$b] -ne $referenceTerminalUuid[$b]) { $match = $false; break }
     }
     if ($match) { $smaModuleOldIndex = $m; break }
 }
 if ($smaModuleOldIndex -lt 0) {
-    throw "Could not locate AndroidSMA TypeMapModule record by oracle uuid in libxamarin-app.so"
+    throw "Could not locate Terminal TypeMapModule record by reference uuid in libxamarin-app.so"
 }
 [System.Buffer]::BlockCopy($activeMvidBytes, 0, $moduleRecords[$smaModuleOldIndex], 0, 16)
 Write-Host "  TypeMapModule[$smaModuleOldIndex] uuid replaced with fresh MVID"
@@ -751,15 +751,15 @@ for ($j = 0; $j -lt $javaEntryCount; $j++) {
 }
 Write-Host "  TypeMapJava module_index fields remapped: $remappedCount entries updated"
 
-# Verify patch integrity: count total bytes changed vs oracle
-$oracleOrigBytes = [System.IO.File]::ReadAllBytes($origXamarinAppPath)
+# Verify patch integrity: count total bytes changed vs reference
+$referenceOrigBytes = [System.IO.File]::ReadAllBytes($origXamarinAppPath)
 $patchDiffs = 0
-for ($bi = 0; $bi -lt $oracleOrigBytes.Length; $bi++) {
-    if ($oracleOrigBytes[$bi] -ne $xamarinAppBytes[$bi]) { $patchDiffs++ }
+for ($bi = 0; $bi -lt $referenceOrigBytes.Length; $bi++) {
+    if ($referenceOrigBytes[$bi] -ne $xamarinAppBytes[$bi]) { $patchDiffs++ }
 }
 $activeGuid = New-Object System.Guid (,$activeMvidBytes)
 Write-Host "  Patched libxamarin-app.so with MVID: $activeGuid"
-Write-Host "  Total bytes changed vs oracle: $patchDiffs"
+Write-Host "  Total bytes changed vs reference: $patchDiffs"
 
 #region 06.5 — Spike 1: Generic Peer / DEX Realization
 Write-Host "06.5 — Generating classes.dex from semantic SMActivity peer..."
@@ -767,16 +767,16 @@ $spikeDexDir = Join-Path $tempDir "spike1_dex"
 if (Test-Path $spikeDexDir) { Remove-Item $spikeDexDir -Recurse -Force }
 $spikeSrcDir = Join-Path $spikeDexDir "src"
 $spikeClassesDir = Join-Path $spikeDexDir "classes"
-New-Item -ItemType Directory -Path (Join-Path $spikeSrcDir "dev\mansfieldplumbing\androidsma") -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $spikeSrcDir "dev\mansfieldplumbing\terminal") -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $spikeSrcDir "mono") -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $spikeSrcDir "net\dot\android") -Force | Out-Null
 New-Item -ItemType Directory -Path $spikeClassesDir -Force | Out-Null
 
 # Semantic Peer Definition
 $peerDeclaration = [PSCustomObject]@{
-    PackageName     = 'dev.mansfieldplumbing.androidsma'
+    PackageName     = 'dev.mansfieldplumbing.terminal'
     ClassName       = 'SMActivity'
-    ManagedType     = 'AndroidSMA.SMActivity, AndroidSMA'
+    ManagedType     = 'Dev.MansfieldPlumbing.Terminal.SMActivity, Dev.MansfieldPlumbing.Terminal'
     BaseClass       = 'android.app.Activity'
     Interfaces      = @('mono.android.IGCUserPeer')
     Overrides       = @(
@@ -857,14 +857,14 @@ Set-Content -Path $peerJavaFile -Value $peerJavaCode -Encoding UTF8
 
 # Static framework registration sources
 $rJavaCode = @"
-package dev.mansfieldplumbing.androidsma;
+package dev.mansfieldplumbing.terminal;
 public final class R {
     public static final class drawable {
-        public static final int androidsma_banner = 0x7f010000;
+        public static final int terminal_banner = 0x7f010000;
     }
 }
 "@
-Set-Content -Path (Join-Path $spikeSrcDir "dev\mansfieldplumbing\androidsma\R.java") -Value $rJavaCode -Encoding UTF8
+Set-Content -Path (Join-Path $spikeSrcDir "dev\mansfieldplumbing\terminal\R.java") -Value $rJavaCode -Encoding UTF8
 
 $appRegCode = @"
 package net.dot.android;
@@ -878,7 +878,7 @@ Set-Content -Path (Join-Path $spikeSrcDir "net\dot\android\ApplicationRegistrati
 $monoResCode = @"
 package mono;
 public class MonoPackageManager_Resources {
-    public static String[] Assemblies = new String[] { "AndroidSMA.PackagingHost.dll" };
+    public static String[] Assemblies = new String[] { "Dev.MansfieldPlumbing.Terminal.dll" };
 }
 "@
 Set-Content -Path (Join-Path $spikeSrcDir "mono\MonoPackageManager_Resources.java") -Value $monoResCode -Encoding UTF8
@@ -952,7 +952,7 @@ function New-BinaryAxmlManifest {
     param(
         [Parameter(Mandatory)] [string] $PackageName,
         [Parameter(Mandatory)] [string] $ActivityClassName,
-        [string] $ActivityLabel = "AndroidSMA",
+        [string] $ActivityLabel = "Terminal",
         [int] $VersionCode = 1,
         [string] $VersionName = "1.0",
         [int] $MinSdkVersion = 26,
@@ -1291,8 +1291,8 @@ foreach ($relPath in $entryNames) {
     } elseif ($relPath -eq "AndroidManifest.xml") {
         $rawBytes = [System.IO.File]::ReadAllBytes($generatedAxmlPath)
     } else {
-        $fullPath = Join-Path $oracleExtractDir ($relPath.Replace('/', '\'))
-        if (-not (Test-Path $fullPath)) { throw "Oracle artifact missing: $fullPath" }
+        $fullPath = Join-Path $referenceExtractDir ($relPath.Replace('/', '\'))
+        if (-not (Test-Path $fullPath)) { throw "Reference artifact missing: $fullPath" }
         $rawBytes = [System.IO.File]::ReadAllBytes($fullPath)
     }
     $isStored = ($relPath -eq 'resources.arsc')

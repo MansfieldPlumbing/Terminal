@@ -57,11 +57,11 @@ param(
     [string] $DeviceInstance,
 
     [string] $Manufacturer = 'MansfieldPlumbing',
-    [string] $Model        = 'AndroidSMA',
+    [string] $Model        = 'Terminal',
     [string] $Description  = 'SMA USB accessory',
     [string] $Version      = '1',
     [string] $Uri          = '',
-    [string] $Serial       = 'AndroidSMA',
+    [string] $Serial       = 'Terminal',
 
     [ValidateRange(0,30000)]
     [int] $WaitMilliseconds = 5000,

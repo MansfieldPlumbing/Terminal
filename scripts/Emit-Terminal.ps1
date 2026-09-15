@@ -1,7 +1,7 @@
 #Requires -Version 7.0
 [CmdletBinding()]
 param(
-    [string] $OutputPath = (Join-Path (Split-Path -Parent $PSScriptRoot) 'build\generated\AndroidSMA.dll')
+    [string] $OutputPath = (Join-Path (Split-Path -Parent $PSScriptRoot) 'build\generated\Dev.MansfieldPlumbing.Terminal.dll')
 )
 
 Set-StrictMode -Version Latest
@@ -39,14 +39,14 @@ $output = [IO.Path]::GetFullPath($OutputPath)
 [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($output)) | Out-Null
 if ([IO.File]::Exists($output)) { [IO.File]::Delete($output) }
 
-$assemblyName = [Reflection.AssemblyName]::new('AndroidSMA')
+$assemblyName = [Reflection.AssemblyName]::new('Dev.MansfieldPlumbing.Terminal')
 $assemblyBuilder = [Reflection.Emit.PersistedAssemblyBuilder]::new($assemblyName, [object].Assembly)
-$moduleBuilder = $assemblyBuilder.DefineDynamicModule('AndroidSMA.dll')
+$moduleBuilder = $assemblyBuilder.DefineDynamicModule('Dev.MansfieldPlumbing.Terminal.dll')
 $programType = $moduleBuilder.DefineType(
-    'AndroidSMA.RecoveryProgram',
+    'Dev.MansfieldPlumbing.Terminal.RecoveryProgram',
     [Reflection.TypeAttributes]'Public,Abstract,Sealed,BeforeFieldInit')
 $mainType = $moduleBuilder.DefineType(
-    'AndroidSMA.SMActivity',
+    'Dev.MansfieldPlumbing.Terminal.SMActivity',
     [Reflection.TypeAttributes]'Public,Sealed,Class,BeforeFieldInit',
     $activityType)
 $mainType.DefineDefaultConstructor([Reflection.MethodAttributes]'Public,HideBySig,SpecialName,RTSpecialName') | Out-Null
@@ -74,8 +74,8 @@ $activityAttribute = [Reflection.Emit.CustomAttributeBuilder]::new(
         (Get-ExactProperty $activityAttributeType 'LaunchMode'),
         (Get-ExactProperty $activityAttributeType 'Theme')),
     [object[]]@(
-        'dev.mansfieldplumbing.androidsma.SMActivity',
-        'AndroidSMA',
+        'dev.mansfieldplumbing.terminal.SMActivity',
+        'Terminal',
         $true,
         $true,
         ([Enum]::Parse((Get-AndroidType 'Android.Content.PM.LaunchMode'), 'SingleTop')),
@@ -136,7 +136,7 @@ $createDelegate = Get-ExactMethod ([Delegate]) 'CreateDelegate' @([Type], [Refle
 $a = [Linq.Expressions.Expression]::Parameter($activityType, 'activity')
 $handlerName = [Linq.Expressions.Expression]::Parameter([string], 'handlerName')
 $recoveryProgramRuntimeType = New-StaticCall $typeGetType @(
-    (New-ClrConstant 'AndroidSMA.RecoveryProgram, AndroidSMA' ([string])),
+    (New-ClrConstant 'Dev.MansfieldPlumbing.Terminal.RecoveryProgram, Dev.MansfieldPlumbing.Terminal' ([string])),
     (New-ClrConstant $true ([bool])))
 $eventHandlerRuntimeType = New-StaticCall $typeGetType @(
     (New-ClrConstant 'System.EventHandler' ([string])),
@@ -322,7 +322,7 @@ $androidLogError = Get-ExactMethod $androidLogType 'Error' @([string], [string])
 $distressMessage = [Linq.Expressions.Expression]::Parameter([string], 'message')
 $writeDistressBody = New-ClrBlock @() @(
     (New-StaticCall $androidLogError @(
-        (New-ClrConstant 'AndroidSMA' ([string])),
+        (New-ClrConstant 'Terminal' ([string])),
         $distressMessage)),
     [Linq.Expressions.Expression]::Empty())
 $writeDistressMethod = Add-PersistedMethod $programType 'WriteDistress' $privateStatic ([void]) `
@@ -803,7 +803,7 @@ function New-AppendFact([string] $Label, [Linq.Expressions.Expression] $Value) {
 }
 $privateRootValue = New-ClrProperty (New-ClrProperty $a $filesDirProperty) $absolutePathProperty
 $payloadBody = New-ReturnBlock ([string]) @(
-    (New-AppendLiteral 'ANDROIDSMA RECOVERY REPORT'),
+    (New-AppendLiteral 'TERMINAL RECOVERY REPORT'),
     (New-AppendLiteral ''),
     (New-AppendLiteral 'REQUEST TO OUTSIDE MODEL'),
     (New-AppendLiteral 'Diagnose this startup failure and return a complete replacement Profile.ps1.'),
@@ -868,7 +868,7 @@ $clipboard = [Linq.Expressions.Expression]::Convert(
     $clipboardManagerType)
 $copyBody = New-ClrAssign (New-ClrProperty $clipboard $primaryClipProperty) `
     (New-StaticCall $newPlainText @(
-        (New-ClrConstant 'AndroidSMA recovery report' ([string])),
+        (New-ClrConstant 'Terminal recovery report' ([string])),
         (New-StaticCall $buildPayloadMethod @(
             $senderActivity, (New-ClrProperty $senderButton $contentDescriptionProperty)))))
 $null = Add-PersistedMethod $programType 'CopyClick' $publicStatic ([void]) @([object], [EventArgs]) `
@@ -956,7 +956,7 @@ $programType.CreateType() | Out-Null
 $mainType.CreateType() | Out-Null
 $assemblyBuilder.Save($output)
 
-if (-not [IO.File]::Exists($output)) { throw "AndroidSMA.dll was not created: $output" }
+if (-not [IO.File]::Exists($output)) { throw "Dev.MansfieldPlumbing.Terminal.dll was not created: $output" }
 
 $stream = [IO.File]::OpenRead($output)
 try {
@@ -981,9 +981,9 @@ try {
 finally { $stream.Dispose() }
 
 "DLL_EXISTS=$([IO.File]::Exists($output))"
-"ASSEMBLY=AndroidSMA"
-"SM_ACTIVITY_TYPE=$($typeNames -contains 'AndroidSMA.SMActivity')"
-"RECOVERY_PROGRAM_TYPE=$($typeNames -contains 'AndroidSMA.RecoveryProgram')"
+"ASSEMBLY=Dev.MansfieldPlumbing.Terminal"
+"SM_ACTIVITY_TYPE=$($typeNames -contains 'Dev.MansfieldPlumbing.Terminal.SMActivity')"
+"RECOVERY_PROGRAM_TYPE=$($typeNames -contains 'Dev.MansfieldPlumbing.Terminal.RecoveryProgram')"
 "METHOD_BODIES=$methodBodies"
 "MONO_ANDROID_REFERENCE=$($references -contains 'Mono.Android')"
 "PERSISTENCE_BACKEND=Microsoft.LambdaCompiler"

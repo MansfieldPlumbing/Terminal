@@ -6,7 +6,7 @@ param([Android.App.Activity] $Activity = $global:Activity)
 
 # PowerShell authors retained Android objects once. Android owns focus, input,
 # animation, composition, and every intermediate frame after this script returns.
-if ($null -eq $Activity) { throw 'Profile.ps1 requires AndroidSMA to provide $Activity.' }
+if ($null -eq $Activity) { throw 'Profile.ps1 requires Terminal to provide $Activity.' }
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -130,7 +130,7 @@ function New-RetainedTile($Descriptor, [int]$Cell, [int]$Gap) {
     }
 }
 
-# Application-owned semantic content. None of this is represented in AndroidSMA.dll.
+# Application-owned semantic content. None of this is represented in Dev.MansfieldPlumbing.Terminal.dll.
 $tiles = @(
     [pscustomobject]@{ Id='phone';     Title='Phone';             Glyph='☎';  Back='2 missed calls';             Action='phone.open';      W=2; H=2; Col=0; Row=0;  Flip=$true;  Color=[Android.Graphics.Color]::Rgb(0,120,215) },
     [pscustomobject]@{ Id='messaging'; Title='Messaging';         Glyph='✉';  Back='Alex: See you at 7pm';       Action='messages.open';   W=2; H=2; Col=2; Row=0;  Flip=$true;  Color=[Android.Graphics.Color]::Rgb(0,153,188) },

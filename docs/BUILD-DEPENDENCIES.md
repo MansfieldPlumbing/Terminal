@@ -17,7 +17,7 @@ The following list is complete for that scope as of this revision.
 | `d8` | `Build-TerminalApk.ps1:952` | Lowers the compiled Java classes and required runtime JARs into `classes.dex`. |
 | `dotnet` | `scripts/Install-AndroidWorkload.ps1:99` | Queries the NuGet global-packages location with `dotnet nuget locals global-packages --list`. |
 
-`Build-TerminalApk.ps1:100` also invokes `scripts/Emit-AndroidSMA.ps1`, but that is
+`Build-TerminalApk.ps1:100` also invokes `scripts/Emit-Terminal.ps1`, but that is
 a repository script executed by the current PowerShell process, not an
 external executable.
 

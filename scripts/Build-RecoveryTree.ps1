@@ -376,14 +376,14 @@ function New-BuildClipboardPayloadLambda {
         $privateRoot,
         (New-ClrConstant 'Profile.ps1' ([string]))))))
     foreach ($line in @(
-        'ANDROIDSMA RECOVERY REPORT',
+        'TERMINAL RECOVERY REPORT',
         '',
         'REQUEST TO OUTSIDE MODEL',
         'Diagnose the startup failure below and return a complete replacement Profile.ps1.',
         'The replacement must use the assemblies and files actually listed in this report.',
         '',
         'RUNTIME CONTRACT',
-        'Profile.ps1 runs inside the AndroidSMA process in a PowerShell runspace.',
+        'Profile.ps1 runs inside the Terminal process in a PowerShell runspace.',
         '$Activity is the live Android.App.Activity.',
         '$PSScriptRoot is the private app-files directory shown below.',
         'Sibling imported files can be referenced beneath $PSScriptRoot.',
@@ -460,7 +460,7 @@ function New-CopyFailureHandler {
     $payload = New-ClrInvoke $buildClipboardPayload @($activity, $details)
     $body = New-ClrInvoke $copyText @(
         $activity,
-        (New-ClrConstant 'AndroidSMA startup failure' ([string])),
+        (New-ClrConstant 'Terminal startup failure' ([string])),
         $payload)
     New-ClrLambda $eventHandlerType $body @($sender, $eventArgs)
 }

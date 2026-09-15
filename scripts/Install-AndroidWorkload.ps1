@@ -17,7 +17,7 @@
         ARM32/ARM64 CoreCLR runtime payloads are present even when the workload policy graph
         would not select them.
 
-    Defaults are the known-good .NET 11 Preview 7 AndroidSMA generation discussed on 2026-09-03.
+    Defaults are the known-good .NET 11 Preview 7 Terminal generation discussed on 2026-09-03.
 
 .NOTES
     Run elevated when DotnetRoot is under Program Files.

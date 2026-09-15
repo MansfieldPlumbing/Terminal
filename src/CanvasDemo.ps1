@@ -671,7 +671,7 @@ function global:Invoke-AndroidCanvasFrame {
 
 $activity = $Activity
 if ($null -eq $activity) {
-    throw 'CanvasDemo.ps1 requires AndroidSMA to provide $Activity, or an Activity passed with -Activity.'
+    throw 'CanvasDemo.ps1 requires Terminal to provide $Activity, or an Activity passed with -Activity.'
 }
 $generation = [Guid]::NewGuid()
 $frequency = [double][Stopwatch]::Frequency
@@ -776,8 +776,8 @@ $edge.KeyPress = $keyPress
             "Canvas tick failed: $_ stack=$($_.ScriptStackTrace)")
     }
 }.GetNewClosure()
-[AndroidSMA.RecoveryProgram]::SetAnimationCallback($onAnimation)
-$callbackMethod = [AndroidSMA.RecoveryProgram].GetMethod(
+[Dev.MansfieldPlumbing.Terminal.RecoveryProgram]::SetAnimationCallback($onAnimation)
+$callbackMethod = [Dev.MansfieldPlumbing.Terminal.RecoveryProgram].GetMethod(
     'RunAnimationCallback',
     [Reflection.BindingFlags]'Public,Static')
 [Action] $animationCallback = $callbackMethod.CreateDelegate([Action])
