@@ -172,8 +172,8 @@ New-Item -ItemType Directory -Path $payloadWorkDir -Force | Out-Null
 # Excluded: Dev.MansfieldPlumbing.Terminal.dll (replaced by emitted build below)
 # Excluded: PackagingHost.dll (unclassified — must defend right to exist; excluded pending runtime verification)
 Get-ChildItem (Join-Path $referencePayloadDir "*.bin") | Where-Object {
-    $_.Name -notmatch 'AndroidSMA\.dll\.bin' -and
-    $_.Name -notmatch 'AndroidSMA\.PackagingHost\.dll\.bin'
+    $_.Name -notmatch 'Dev\.MansfieldPlumbing\.Terminal\.dll\.bin' -and
+    $_.Name -notmatch 'PackagingHost\.dll\.bin'
 } | ForEach-Object {
     Copy-Item $_.FullName (Join-Path $payloadWorkDir $_.Name) -Force
 }
@@ -637,13 +637,13 @@ $xamarinAppBytes = [System.IO.File]::ReadAllBytes($origXamarinAppPath)
 # The Release CoreCLR runtime performs a binary search over managed_to_java_map
 # using memcmp on the raw 16-byte module_uuid field (confirmed in dotnet/android
 # issue #10779).  The array must remain sorted ascending by those bytes.
-# Replacing AndroidSMA's uuid in-place may move it to a different sorted
+# Replacing Terminal's uuid in-place may move it to a different sorted
 # position, invalidating all binary-search results — including lookups for
 # completely unrelated modules.
 #
 # Correct algorithm:
 #   1. Read all three TypeMapModule records from the reference binary.
-#   2. Replace AndroidSMA's uuid with the freshly emitted MVID.
+#   2. Replace Terminal's uuid with the freshly emitted MVID.
 #   3. Sort all records ascending by raw uuid bytes (memcmp order).
 #   4. Build an old-index → new-index remap table.
 #   5. Walk every TypeMapJava entry and remap its module_index field.
