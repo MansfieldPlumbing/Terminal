@@ -1,5 +1,5 @@
 #Requires -Version 7.0
-[CmdletBinding()]
+[CmdletBinding(SupportsShouldProcess)]
 param(
     [ValidateSet('Debug', 'Release')]
     [string] $Configuration = 'Release',
@@ -357,37 +357,19 @@ function Compute-Crc([byte[]]$bytes) {
     return [uint32]($crc -bxor [uint32]::MaxValue)
 }
 
-# 2. Canonical assembly names from reference, filtering unproven assemblies
-$fsIn = [System.IO.File]::OpenRead($referenceXabaPath)
-$brIn = [System.IO.BinaryReader]::new($fsIn)
-$referenceMagic      = $brIn.ReadBytes(4)
-$referenceVersion    = $brIn.ReadUInt32()
-$referenceEntryCount = $brIn.ReadUInt32()
-$referenceIndexEntryCount = $brIn.ReadUInt32()
-$referenceIndexSize  = $brIn.ReadUInt32()
-$referenceStoreId    = $brIn.ReadUInt64()
-$brIn.ReadBytes($referenceIndexSize + (28 * $referenceEntryCount)) | Out-Null
-$referenceNames = for ($i = 0; $i -lt $referenceEntryCount; $i++) {
-    $len = $brIn.ReadUInt32()
-    [System.Text.Encoding]::UTF8.GetString($brIn.ReadBytes($len))
+# 2. Derive active assembly population directly from staged payloads (zero reference-xaba.bin dependency)
+$payloadFiles = Get-ChildItem -Path $payloadWorkDir -Filter "*.bin" | Sort-Object Name
+if ($payloadFiles.Count -eq 0) {
+    throw "No payload files found in $payloadWorkDir. Run Region 04 first."
 }
-$fsIn.Close()
 
-# Active assemblies (even indices in reference pairing), excluding PackagingHost.dll
 $activeAssemblies = [System.Collections.Generic.List[object]]::new()
-for ($i = 0; $i -lt $referenceEntryCount; $i += 2) {
-    $name = $referenceNames[$i]
-    if ($name -match 'PackagingHost\.dll$') {
-        Write-Host "  Excluding unproven assembly from XABA population: $name"
-        continue
-    }
-    $safeName = $name.Replace('/', '_').Replace('\', '_')
-    $matchedFile = Get-ChildItem $payloadWorkDir -Filter "*_${safeName}.bin" | Select-Object -First 1
-    if (-not $matchedFile) { throw "Missing payload file for $name in $payloadWorkDir" }
+foreach ($f in $payloadFiles) {
+    $asmName = $f.BaseName # e.g. System.Management.Automation.dll
     $activeAssemblies.Add([PSCustomObject]@{
-        Name = $name
-        File = $matchedFile.FullName
-        Size = [uint32](Get-Item $matchedFile.FullName).Length
+        Name = $asmName
+        File = $f.FullName
+        Size = [uint32]$f.Length
     })
 }
 
@@ -395,6 +377,8 @@ $N = $activeAssemblies.Count
 $descCount = 2 * $N
 $idxCount = 4 * $N
 $idxSize = $idxCount * 9
+$xabaVersion = [uint32]0x80010004
+$xabaStoreId = [uint64]1
 
 # 3. Build Descriptors and Names
 $genNames = [string[]]::new($descCount)
@@ -471,56 +455,60 @@ for ($i = 0; $i -lt $N; $i++) {
     $curOffset += [uint32]$activeAssemblies[$i].Size
 }
 
+Write-Host "  XABA Layout: $N assemblies | $descCount descriptors | $idxCount index entries ($idxSize bytes) | Total Size: $curOffset bytes"
+
 # 6. Serialize XABA Binary Store
-$fsOut = [System.IO.File]::Create($generatedXabaPath)
-$bwOut = [System.IO.BinaryWriter]::new($fsOut)
+if ($PSCmdlet.ShouldProcess($generatedXabaPath, "Serialize XABA assembly store binary")) {
+    $fsOut = [System.IO.File]::Create($generatedXabaPath)
+    $bwOut = [System.IO.BinaryWriter]::new($fsOut)
 
-# Header
-$bwOut.Write([byte[]]@(0x58, 0x41, 0x42, 0x41)) # 'XABA'
-$bwOut.Write([uint32]$referenceVersion)
-$bwOut.Write([uint32]$descCount)
-$bwOut.Write([uint32]$idxCount)
-$bwOut.Write([uint32]$idxSize)
-$bwOut.Write([uint64]$referenceStoreId)
+    # Header
+    $bwOut.Write([byte[]]@(0x58, 0x41, 0x42, 0x41)) # 'XABA'
+    $bwOut.Write([uint32]$xabaVersion)
+    $bwOut.Write([uint32]$descCount)
+    $bwOut.Write([uint32]$idxCount)
+    $bwOut.Write([uint32]$idxSize)
+    $bwOut.Write([uint64]$xabaStoreId)
 
-# Index Table
-foreach ($e in $sortedIndex) {
-    $bwOut.Write([uint32]$e.Hash)
-    $bwOut.Write([uint32]$e.DescriptorIndex)
-    $bwOut.Write([byte]$e.Flags)
-}
-
-# Descriptors Table
-foreach ($d in $genDescriptors) {
-    $bwOut.Write([uint32]$d.MappingIndex)
-    $bwOut.Write([uint32]$d.DataOffset)
-    $bwOut.Write([uint32]$d.DataSize)
-    $bwOut.Write([uint32]$d.DebugOffset)
-    $bwOut.Write([uint32]$d.DebugSize)
-    $bwOut.Write([uint32]$d.ConfigOffset)
-    $bwOut.Write([uint32]$d.ConfigSize)
-}
-
-# Names Table
-foreach ($name in $genNames) {
-    $nb = [System.Text.Encoding]::UTF8.GetBytes($name)
-    $bwOut.Write([uint32]$nb.Length)
-    $bwOut.Write($nb)
-}
-
-# Payloads
-for ($i = 0; $i -lt $N; $i++) {
-    if ($bwOut.BaseStream.Position -ne $genDescriptors[2*$i].DataOffset) {
-        throw "Offset mismatch for $($activeAssemblies[$i].Name): pos=$($bwOut.BaseStream.Position), expected=$($genDescriptors[2*$i].DataOffset)"
+    # Index Table
+    foreach ($e in $sortedIndex) {
+        $bwOut.Write([uint32]$e.Hash)
+        $bwOut.Write([uint32]$e.DescriptorIndex)
+        $bwOut.Write([byte]$e.Flags)
     }
-    $pBytes = [System.IO.File]::ReadAllBytes($activeAssemblies[$i].File)
-    $bwOut.Write($pBytes)
-}
-$fsOut.Flush()
-$fsOut.Close()
 
-$generatedXabaHash = (Get-FileHash $generatedXabaPath -Algorithm SHA256).Hash
-Write-Host "  XABA store constructed: $N active assemblies ($descCount descriptors, $idxCount index entries, $generatedXabaHash, $((Get-Item $generatedXabaPath).Length) bytes)"
+    # Descriptors Table
+    foreach ($d in $genDescriptors) {
+        $bwOut.Write([uint32]$d.MappingIndex)
+        $bwOut.Write([uint32]$d.DataOffset)
+        $bwOut.Write([uint32]$d.DataSize)
+        $bwOut.Write([uint32]$d.DebugOffset)
+        $bwOut.Write([uint32]$d.DebugSize)
+        $bwOut.Write([uint32]$d.ConfigOffset)
+        $bwOut.Write([uint32]$d.ConfigSize)
+    }
+
+    # Names Table
+    foreach ($name in $genNames) {
+        $nb = [System.Text.Encoding]::UTF8.GetBytes($name)
+        $bwOut.Write([uint32]$nb.Length)
+        $bwOut.Write($nb)
+    }
+
+    # Payloads
+    for ($i = 0; $i -lt $N; $i++) {
+        if ($bwOut.BaseStream.Position -ne $genDescriptors[2*$i].DataOffset) {
+            throw "Offset mismatch for $($activeAssemblies[$i].Name): pos=$($bwOut.BaseStream.Position), expected=$($genDescriptors[2*$i].DataOffset)"
+        }
+        $pBytes = [System.IO.File]::ReadAllBytes($activeAssemblies[$i].File)
+        $bwOut.Write($pBytes)
+    }
+    $fsOut.Flush()
+    $fsOut.Close()
+
+    $generatedXabaHash = (Get-FileHash $generatedXabaPath -Algorithm SHA256).Hash
+    Write-Host "  XABA store constructed: $N active assemblies ($descCount descriptors, $idxCount index entries, $generatedXabaHash, $((Get-Item $generatedXabaPath).Length) bytes)"
+}
 #endregion
 
 #region 06 — Materialize XABA as ELF (llvm-mc + ld)
