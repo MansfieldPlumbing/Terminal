@@ -130,23 +130,70 @@ if (-not (Test-Path $tempDir)) {
 }
 #endregion
 
-#region 03 — Reference Build Verification (Pinned Generation E85A25C3)
-# The build borrows proven shell artifacts from an immutable, byte-pinned reference generation:
-# Reference APK: E85A25C3A632FB0BB319769D1B19C3CBDAAA25A0B1406E752DC011F8883B3BF1
-# Reference XABA: 3EC2CEF338CD39D5A8B9410052A73EF3E8C924C537DCA4BC2BAF0B95BF2BE741
-$referenceDir = Join-Path $PSScriptRoot "build\reference\arm32-E85A25C3"
-if ($RuntimeIdentifier -ne 'android-arm' -or -not (Test-Path $referenceDir)) {
-    throw "Reference build is currently pinned for android-arm at $referenceDir. Other architectures require pinned reference build."
+#region 03 - Package Acquisition & Integrity Manifest (Pinned net11.0 / Direct NuGet)
+Write-Host "03 - Acquiring and verifying runtime package dependencies for $RuntimeIdentifier..."
+$packagesDir = Join-Path $PSScriptRoot "build\packages"
+if (-not (Test-Path $packagesDir)) {
+    New-Item -ItemType Directory -Path $packagesDir -Force | Out-Null
 }
 
-$referenceXabaPath   = Join-Path $referenceDir "reference-xaba.bin"
-$referencePayloadDir = Join-Path $referenceDir "payloads"
-$referenceExtractDir = Join-Path $referenceDir "extracted"
+$coreClrRuntimePackage = if ($RuntimeIdentifier -eq 'android-arm64') {
+    @{
+        Id      = 'Microsoft.NETCore.App.Runtime.android-arm64'
+        Version = '11.0.0-preview.7.26381.103'
+        Sha256  = '3D36719B206DD2270E78684390523FE7060B7309E6EC429E99DCD7C4E3535680'
+    }
+} elseif ($RuntimeIdentifier -eq 'android-arm') {
+    @{
+        Id      = 'Microsoft.NETCore.App.Runtime.android-arm'
+        Version = '11.0.0-preview.7.26381.103'
+        Sha256  = 'AB44D6BC986BD11D68FD75A6582D4DFCE34379DA5A9DDA355830CF62BAF9C701'
+    }
+} else {
+    throw "Unsupported RuntimeIdentifier: $RuntimeIdentifier. Supported: android-arm64, android-arm."
+}
 
-$expectedXabaHash = "3EC2CEF338CD39D5A8B9410052A73EF3E8C924C537DCA4BC2BAF0B95BF2BE741"
-$actualXabaHash   = (Get-FileHash $referenceXabaPath -Algorithm SHA256).Hash
-if ($actualXabaHash -ne $expectedXabaHash) {
-    throw "Reference XABA hash mismatch!`n  Expected: $expectedXabaHash`n  Got:      $actualXabaHash"
+$packageManifest = @(
+    $coreClrRuntimePackage,
+    @{
+        Id      = 'Microsoft.Android.Runtime.37.android'
+        Version = '37.0.0-preview.7.2131'
+        Sha256  = '88359BAD03DA798248ADC74555C46225946373A4101B49B6F9C6C598C101B6B7'
+    },
+    @{
+        Id      = 'System.Management.Automation'
+        Version = '7.7.0-preview.2'
+        Sha256  = '42DE3E85CF7A9C710C8641142E81B266D8BB71828D1968A98122B50BA636652A'
+    }
+)
+
+$verifiedPackages = @{}
+
+foreach ($pkg in $packageManifest) {
+    $nupkgName = "$($pkg.Id).$($pkg.Version).nupkg"
+    $nupkgPath = Join-Path $packagesDir $nupkgName
+
+    if (Test-Path $nupkgPath) {
+        $actualHash = (Get-FileHash -Path $nupkgPath -Algorithm SHA256).Hash
+        if ($actualHash -ne $pkg.Sha256) {
+            Write-Warning "Cached package hash mismatch for $nupkgName. Re-downloading..."
+            Remove-Item $nupkgPath -Force
+        }
+    }
+
+    if (-not (Test-Path $nupkgPath)) {
+        $url = "https://api.nuget.org/v3-flatcontainer/$($pkg.Id.ToLowerInvariant())/$($pkg.Version.ToLowerInvariant())/$($pkg.Id.ToLowerInvariant()).$($pkg.Version.ToLowerInvariant()).nupkg"
+        Write-Host "  Downloading $($pkg.Id) ($($pkg.Version))..."
+        Invoke-WebRequest -Uri $url -OutFile $nupkgPath -UseBasicParsing
+    }
+
+    $actualHash = (Get-FileHash -Path $nupkgPath -Algorithm SHA256).Hash
+    if ($actualHash -ne $pkg.Sha256) {
+        throw "Package integrity verification failed for $nupkgName!`n  Expected: $($pkg.Sha256)`n  Actual:   $actualHash"
+    }
+
+    Write-Host "  Verified: $nupkgName ($actualHash)"
+    $verifiedPackages[$pkg.Id] = $nupkgPath
 }
 #endregion
 
